@@ -1,0 +1,1 @@
+{"version":3,"file":"BusinessLogicError.js","sourceRoot":"","sources":["../../../src/shared/errors/BusinessLogicError.ts"],"names":[],"mappings":";;;AAAA,yCAAsC;AAEtC,MAAa,kBAAmB,SAAQ,mBAAQ;IAC9C,YAAY,OAAe;QACzB,KAAK,CAAC,OAAO,EAAE,GAAG,CAAC,CAAC;IACtB,CAAC;CACF;AAJD,gDAIC"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"FileReadingError.js","sourceRoot":"","sources":["../../../src/shared/errors/FileReadingError.ts"],"names":[],"mappings":";;;AAAA,+CAA4C;AAE5C,MAAa,gBAAiB,SAAQ,yBAAW;IAC/C,YAAY,OAAe;QACzB,KAAK,CAAC,OAAO,EAAE,GAAG,CAAC,CAAC;IACtB,CAAC;CACF;AAJD,4CAIC"}

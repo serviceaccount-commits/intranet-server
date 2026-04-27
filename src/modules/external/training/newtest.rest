@@ -1,0 +1,38 @@
+// @Host
+@hostname = http://localhost:3000
+// @Authentication Refresh Token
+@refreshToken = eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImE4MDY0Mzc5LTQ4ZWUtNGI3Mi1iYmViLWFjOThkN2Y1YTFjMSIsInVzZXJuYW1lIjoiQWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTUwMTM5MDQsImV4cCI6MTc1NTEwMDMwNCwiYXVkIjoiaW50cmFuZXQtY2xpZW50IiwiaXNzIjoiaHR0cHM6Ly9hcGkuaW50cmFuZXQucGFyaWN1cy5jb20ifQ.Vwu29jmncobIGxvbpnWOaPKEmZGa9HZph_GOkYsC_aOg1e0mrhKa6llf9OFiTFQI7mK1t1p7fgu4G09Uz_Deo92G9LlHjorgfEq5z1enN7Dm0RRDaV1iypPHPI9554286jGOilYMBQuPDTQX6e7BroXx90pQ-5CWRCo3qyBcj7GjpjyjLJduImPSj6ajbXuQHdfvH3xZpJztaYBNSvQ-v6qfWTzvvrIic6meMmyzF9U5oTd1VRx6jw6ES82gdd7nG7Y4Ftj011gjgXiWsjYjcoaqizQtiCIUIVst8gnBprgAhxSrf_AZFUfpPDOIVwu09952PM3n7spnC31egiLNtw
+### SUBMIT ANSWERS FOR EXAM
+// @no-cookie-jar
+POST {{hostname}}/api/v1/exam-attempts
+Content-Type: application/json
+Cookie: refreshToken={{refreshToken}}
+
+{
+  "examId": "a0b57ad0-e4f2-43da-81c0-3ca60c2a5247",
+  "answers": [
+    {
+      "questionId": "5ee83dda-e34b-49c1-86dd-7c9d8abde696",
+      "optionId": []
+    },
+    {
+      "questionId": "d38da5de-9aa4-41a8-9ed8-663ac1b22249",
+      "optionId": ["40c83010-f654-4dee-8d77-ae5be3d52c14"]
+    }
+  ]
+}
+
+### SUBMIT ANSWERS FOR EXAM
+// @no-cookie-jar
+GET {{hostname}}/api/v1/courses/course/2b56e9cd-2b7e-4511-af0b-6c509f2e28ef/progress
+Cookie: refreshToken={{refreshToken}}
+
+### CREATE NEW ASSIGNMENT
+// @no-cookie-jar
+POST {{hostname}}/api/v1/assignments
+Content-Type: application/json
+Cookie: refreshToken={{refreshToken}}
+
+{
+  "assignmentName": "Human Resources Management"
+}

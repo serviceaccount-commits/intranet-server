@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"name": "intranet-server",
+			"path": "../../../../.."
+		}
+	],
+	"settings": {
+		"editor.formatOnSave": true,
+		"editor.codeActionsOnSave": {
+			"source.fixAll.eslint": "explicit"
+		},
+		"eslint.validate": [
+			"javascript",
+			"javascriptreact",
+			"typescript",
+			"typescriptreact"
+		],
+		"[javascript]": {
+			"editor.defaultFormatter": "esbenp.prettier-vscode"
+		},
+		"prettier.requireConfig": true,
+		"prettier.ignorePath": ".prettierignore",
+		"workbench.colorCustomizations": {
+			"activityBar.background": "#42280E",
+			"titleBar.activeBackground": "#5C3714",
+			"titleBar.activeForeground": "#FDFAF6"
+		}
+	}
+}

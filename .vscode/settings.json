@@ -1,0 +1,22 @@
+{
+  "editor.formatOnSave": true, // Enable format on save
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit" // Run ESLint's fixAll on save
+  },
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "[typescript]": {
+    // Specific settings for TypeScript files
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // Use Prettier for TypeScript
+  },
+  "[javascript]": {
+    //Specific setting for Javascript files
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "prettier.requireConfig": true, // Only format if a Prettier config file is present
+  "prettier.ignorePath": ".prettierignore" //Use the ignore file
+}

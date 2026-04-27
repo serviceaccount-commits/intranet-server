@@ -1,0 +1,54 @@
+import 'reflect-metadata';
+
+import { Router } from 'express';
+import { usersRouter } from '../modules/internal/users/api/users.router';
+import { rolesRouter } from '../modules/internal/users/api/roles.router';
+import { userReportsToRouter } from '../modules/internal/users/api/userReportsTo.router';
+import { assignmentsRouter } from '../modules/internal/users/api/assignments.router';
+import { clientsRouter } from '../modules/external/knowledgeBase/api/clients.router';
+import { topicsRouter } from '../modules/external/knowledgeBase/api/topics.router';
+import { articlesRouter } from '../modules/external/knowledgeBase/api/articles.router';
+import { tagsRouter } from '../modules/external/knowledgeBase/api/tags.router';
+import { announcementsRouter } from '../modules/external/announcements/api/announcements.router';
+import { customFieldsRouter } from '../modules/internal/users/api/customFields.router';
+import { sdOrderRouter } from '../modules/external/humanResources/api/staffDirectoryOrders.router';
+import { courseRouter } from '../modules/external/training/api/courses.router';
+import { topicRouter as trainingTopicRouter } from '../modules/external/training/api/trainingTopics.router';
+import { classRouter } from '../modules/external/training/api/classes.router';
+import { examRouter } from '../modules/external/training/api/exams.router';
+import { userExamAttemptRouter } from '../modules/external/training/api/userExamAttempts.router';
+import { questionRouter } from '../modules/external/training/api/questions.router';
+import { questionTypesRouter } from '../modules/external/training/api/questionTypes.router';
+import { optionsRouter } from '../modules/external/training/api/options.router';
+import { authRouter } from '../modules/internal/auth/api/auth.router';
+import { externalRouter } from '../modules/external/knowledgeBase/api/external.router';
+import { verifyApiKey } from '../modules/internal/auth/middlewares/apiKey.middleware';
+import { documentsRouter } from '../modules/internal/documents/api/documents.router';
+import { authenticateJWT } from '../modules/internal/auth/middlewares/auth.middleware';
+
+const apiLayerRouter = Router();
+
+apiLayerRouter.use('/v1/users', authenticateJWT, usersRouter);
+apiLayerRouter.use('/v1/roles', authenticateJWT, rolesRouter);
+apiLayerRouter.use('/v1/reports-to', authenticateJWT, userReportsToRouter);
+apiLayerRouter.use('/v1/assignments', authenticateJWT, assignmentsRouter);
+apiLayerRouter.use('/v1/clients', authenticateJWT, clientsRouter);
+apiLayerRouter.use('/v1/topics', authenticateJWT, topicsRouter);
+apiLayerRouter.use('/v1/articles', authenticateJWT, articlesRouter);
+apiLayerRouter.use('/v1/tags', authenticateJWT, tagsRouter);
+apiLayerRouter.use('/v1/announcements', authenticateJWT, announcementsRouter);
+apiLayerRouter.use('/v1/customFields', authenticateJWT, customFieldsRouter);
+apiLayerRouter.use('/v1/sd-order', authenticateJWT, sdOrderRouter);
+apiLayerRouter.use('/v1/courses', authenticateJWT, courseRouter);
+apiLayerRouter.use('/v1/training-topics', authenticateJWT, trainingTopicRouter);
+apiLayerRouter.use('/v1/classes', authenticateJWT, classRouter);
+apiLayerRouter.use('/v1/exams', authenticateJWT, examRouter);
+apiLayerRouter.use('/v1/exam-attempts', authenticateJWT, userExamAttemptRouter);
+apiLayerRouter.use('/v1/questions', authenticateJWT, questionRouter);
+apiLayerRouter.use('/v1/questionTypes', authenticateJWT, questionTypesRouter);
+apiLayerRouter.use('/v1/options', authenticateJWT, optionsRouter);
+apiLayerRouter.use('/v1/external/articles', verifyApiKey, externalRouter);
+apiLayerRouter.use('/v1/auth', authRouter);
+apiLayerRouter.use('/v1/documents', documentsRouter);
+
+export default apiLayerRouter;

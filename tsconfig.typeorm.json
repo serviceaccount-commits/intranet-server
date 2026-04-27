@@ -1,0 +1,9 @@
+// tsconfig.typeorm.json
+ {
+   "extends": "./tsconfig.json", // Inherit from your main tsconfig
+   "compilerOptions": {
+     "allowImportingTsExtensions": true, // Enable for TypeORM CLI
+     "noEmit": true // Prevents accidental compilation with these settings
+   },
+   "include": ["src/database/**/*", "src/config/**/*"] // Include only relevant files
+ }

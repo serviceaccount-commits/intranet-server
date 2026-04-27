@@ -1,0 +1,44 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+// Entity Status
+var ES;
+(function (ES) {
+    ES["PUBLISHED"] = "published";
+    ES["ARCHIVED"] = "archived";
+    ES["DRAFT"] = "draft";
+    ES["OUTDATED"] = "outdated";
+    ES["UNPUBLISHED"] = "unpublished";
+    ES["IN_PROGRESS"] = "in-progress";
+    ES["AWAITING_APPROVAL"] = "awaiting-approval";
+    ES["APPROVED"] = "approved";
+    ES["CLASS_EXAM"] = "class-exam";
+    ES["STANDALONE_EXAM"] = "standalone-exam";
+    ES["ACTIVE"] = "active";
+    ES["INACTIVE"] = "inactive";
+    ES["HIGH"] = "high";
+    ES["MEDIUM"] = "medium";
+    ES["LOW"] = "low";
+    ES["PUBLIC"] = "public";
+    ES["PRIVATE"] = "private";
+    ES["STRING"] = "string";
+    ES["BOOLEAN"] = "boolean";
+    ES["DATE"] = "date";
+    ES["NO_REPORTS_TO"] = "no-reports-to";
+    ES["COMPLETED"] = "completed";
+    ES["INCOMPLETE"] = "incomplete";
+    ES["OPENED"] = "opened";
+    ES["CLOSED"] = "closed";
+    ES["MULTIPLE_SELECTION"] = "multiple-selection";
+    ES["TRUE_FALSE"] = "true-false";
+    ES["PASSED"] = "passed";
+    ES["FAILED"] = "failed";
+    ES["CAN_RETAKE"] = "can-retake";
+    ES["NOT_ATTEMPTED"] = "not-attempted";
+    ES["NO_EXAM"] = "no-exam";
+    ES["REGULAR"] = "regular";
+    ES["PERSISTENT"] = "persistent";
+    ES["PARICUS_LLC"] = "paricus-llc";
+    ES["PARICUS_COLOMBIA"] = "paricus-colombia";
+})(ES || (ES = {}));
+exports.default = ES;
+//# sourceMappingURL=ES.js.map

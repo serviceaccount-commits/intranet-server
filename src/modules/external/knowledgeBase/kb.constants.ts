@@ -1,0 +1,3 @@
+export const ARTICLE_LOCK_DURATION_MS = 60_000;
+export const LOCK_CHECK_INTERVAL_MS = 250_000;
+export const HEARTBEAT_INTERVAL_MS = 30_000;

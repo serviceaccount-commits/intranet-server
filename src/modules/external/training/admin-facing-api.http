@@ -1,0 +1,105 @@
+# // @Host
+# @hostname = http://localhost:3000
+# // @Authentication Refresh Token
+# @refreshToken = 
+
+# ### GET ALL USERS
+# GET {{hostname}}/api/v1/users
+# Cookie: refreshToken={{refreshToken}}
+
+
+# ### GET ALL USERS
+# POST {{hostname}}/api/v1/users
+# Cookie: refreshToken={{refreshToken}}
+
+# ### CREATE QUESTION TYPE
+# POST {{hostname}}/api/v1/questionTypes
+# Content-Type: application/json
+# Cookie: refreshToken={{refreshToken}}
+
+# {
+#   "typeName": "true-false"
+# }
+
+# ### CREATE EXAM
+# POST {{hostname}}/api/v1/exams
+# Content-Type: application/json
+# Cookie: refreshToken={{refreshToken}}
+
+# {
+#   "classId": "50a23271-cf10-49c9-9cc8-bb1dc4a079c4",
+#   "referenceExamId": "e5884403-ca30-4a8d-b388-c1e3c7296741"
+# }
+
+# ### ADD QUESTION TO EXAM
+# POST {{hostname}}/api/v1/questions
+# Content-Type: application/json
+# Cookie: refreshToken={{refreshToken}}
+
+# {
+#   "examId": "ee912173-19fe-4875-a186-930d51351e26"
+# }
+
+# ### ADD OPTION TO QUESTION
+# POST {{hostname}}/api/v1/options
+# Content-Type: application/json
+# Cookie: refreshToken={{refreshToken}}
+
+# {
+#   "questionId": "2801b77f-6d1b-4a93-96e0-8ac53eb18083"
+
+# }
+
+# ### UPDATE EXAM
+# PUT {{hostname}}/api/v1/exams/a0b57ad0-e4f2-43da-81c0-3ca60c2a5247
+# Content-Type: application/json
+# Cookie: refreshToken={{refreshToken}}
+
+# {
+#   "passingScore": 50,
+#   "maxAttempts": 1,
+#   "examStatus": "published"
+# }
+
+# ### UPDATE QUESTION
+# PUT {{hostname}}/api/v1/questions/5ee83dda-e34b-49c1-86dd-7c9d8abde696
+# Content-Type: application/json
+# Cookie: refreshToken={{refreshToken}}
+
+# {
+#   "examId": "a0b57ad0-e4f2-43da-81c0-3ca60c2a5247",
+#   "questionTypeId": "855e185e-078c-4b7a-8803-c71fd6782433",
+#   "questionText": "What is 2 + 2"
+# }
+
+# ### UPDATE OPTION
+# PUT {{hostname}}/api/v1/options/65f60cf4-52ea-4af3-aa0a-537016b76b07
+# Content-Type: application/json
+# Cookie: refreshToken={{refreshToken}}
+
+# {
+#   "examId": "ee912173-19fe-4875-a186-930d51351e26",
+#   "questionId": "2801b77f-6d1b-4a93-96e0-8ac53eb18083",
+#   "optionText": "My first option text edit with true",
+#   "isCorrect": true
+# }
+
+# ### DELETE OPTION
+# DELETE  {{hostname}}/api/v1/options/214c22e1-19ad-4d45-8efe-b4cd55c2d5f9
+# Cookie: refreshToken={{refreshToken}}
+
+# ### DELETE QUESTION
+# DELETE {{hostname}}/api/v1/questions/907c5c7e-a797-47f3-ba6f-ab0c35883065
+# Cookie: refreshToken={{refreshToken}}
+
+# ### DELETE EXAM
+# DELETE {{hostname}}/api/v1/exams/907c5c7e-a797-47f3-ba6f-ab0c35883065
+# Cookie: refreshToken={{refreshToken}}
+
+# ### GET LATEST EXAM VERSION FOR CLASS
+# GET {{hostname}}/api/v1/exams/class/latest/50a23271-cf10-49c9-9cc8-bb1dc4a079c4
+# Cookie: refreshToken={{refreshToken}}
+
+# ### GET ALL EXAMS FOR CLASS
+# GET {{hostname}}/api/v1/exams/class/50a23271-cf10-49c9-9cc8-bb1dc4a079c4
+# Cookie: refreshToken={{refreshToken}}

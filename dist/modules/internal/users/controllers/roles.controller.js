@@ -1,0 +1,104 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RoleController = void 0;
+const inversify_1 = require("inversify");
+const containerTypes_1 = require("../../../../shared/config/containerTypes");
+const AppError_1 = require("../../../../shared/errors/AppError");
+let RoleController = class RoleController {
+    roleService;
+    constructor(roleService) {
+        this.roleService = roleService;
+    }
+    async createRole(req, res) {
+        let { roleName, roleStatus, permissionIds } = req.body;
+        const newRole = await this.roleService.createRole(roleName, roleStatus, permissionIds);
+        res.json(newRole);
+    }
+    async createRoleBased(req, res, next) {
+        const { roleId } = req.params;
+        const input = req.body;
+        if (!roleId) {
+            res.status(400).json({ message: 'Role ID id required' });
+            return;
+        }
+        try {
+            const role = await this.roleService.createRoleBased(roleId, input);
+            res.json(role);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                return res.status(400).json({ message: error.message });
+            }
+            next(error);
+        }
+    }
+    async getRoles(_req, res) {
+        const roles = await this.roleService.getRoles();
+        res.json(roles);
+    }
+    async getRoleDetails(req, res) {
+        const { roleId } = req.params;
+        if (!roleId) {
+            res.status(400).json({ message: 'Role ID is required' });
+            return;
+        }
+        const role = await this.roleService.getRoleById(roleId);
+        res.json(role);
+    }
+    async updateRolePermissions(req, res, next) {
+        const { roleId } = req.params;
+        const { permissionIds } = req.body;
+        if (!roleId || permissionIds === undefined) {
+            res
+                .status(400)
+                .json({ message: 'Role ID and permission IDs are required' });
+            return;
+        }
+        try {
+            await this.roleService.updateRolePermissions(roleId, permissionIds);
+            res.sendStatus(200);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                return res.status(400).json({ message: error.message });
+            }
+            next(error);
+        }
+    }
+    async deleteRole(req, res, next) {
+        const { roleId } = req.params;
+        if (!roleId) {
+            res.status(400).json({ message: 'Role ID is required' });
+            return;
+        }
+        try {
+            await this.roleService.deleteRole(roleId);
+            res.sendStatus(200);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                return res.status(400).json({ message: error.message });
+            }
+            next(error);
+        }
+    }
+};
+exports.RoleController = RoleController;
+exports.RoleController = RoleController = __decorate([
+    (0, inversify_1.injectable)(),
+    __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IRoleService)),
+    __metadata("design:paramtypes", [Object])
+], RoleController);
+//# sourceMappingURL=roles.controller.js.map

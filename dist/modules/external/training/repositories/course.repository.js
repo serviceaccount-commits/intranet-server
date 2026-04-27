@@ -1,0 +1,76 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CourseRepository = void 0;
+const inversify_1 = require("inversify");
+const data_source_1 = require("../../../../shared/database/data-source");
+const typeorm_1 = require("typeorm");
+const Course_entity_1 = require("../entities/Course.entity");
+let CourseRepository = class CourseRepository {
+    async create(course) {
+        return await data_source_1.AppDataSource.manager.save(course);
+    }
+    async findAll(withUserValues = false) {
+        if (!withUserValues) {
+            return await data_source_1.AppDataSource.manager.find(Course_entity_1.Course, {
+                relations: {
+                    user: true,
+                },
+            });
+        }
+        return await data_source_1.AppDataSource.manager.find(Course_entity_1.Course, {
+            relations: {
+                user: true,
+                userValues: true,
+            },
+        });
+    }
+    async findById(id) {
+        return await data_source_1.AppDataSource.manager.findOne(Course_entity_1.Course, {
+            where: {
+                course_id: id,
+            },
+            relations: {
+                topics: {
+                    classes: true,
+                },
+            },
+        });
+    }
+    async findByIds(ids) {
+        if (!ids || ids.length === 0)
+            return [];
+        return await data_source_1.AppDataSource.manager.find(Course_entity_1.Course, {
+            where: {
+                course_id: (0, typeorm_1.In)(ids),
+            },
+        });
+    }
+    async findByName(courseName) {
+        return await data_source_1.AppDataSource.manager.findOne(Course_entity_1.Course, {
+            where: {
+                course_name: courseName,
+            },
+        });
+    }
+    async findAllByAuthorId(userId) {
+        return await data_source_1.AppDataSource.manager.find(Course_entity_1.Course, {
+            where: {
+                user_id: userId,
+            },
+        });
+    }
+    async save(course) {
+        return await data_source_1.AppDataSource.manager.save(course);
+    }
+};
+exports.CourseRepository = CourseRepository;
+exports.CourseRepository = CourseRepository = __decorate([
+    (0, inversify_1.injectable)()
+], CourseRepository);
+//# sourceMappingURL=course.repository.js.map

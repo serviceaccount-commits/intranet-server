@@ -1,0 +1,9 @@
+// @Host
+@hostname = http://localhost:3000
+@refreshToken = eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImUxYmFiMjc2LTlhZmEtNDg2MC04M2Y1LTA2ZDdhNTY2ZmU4MCIsInVzZXJuYW1lIjoiQWxleCIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1NDQ0NDk5NSwiZXhwIjoxNzU0NTMxMzk1LCJhdWQiOiJpbnRyYW5ldC1jbGllbnQiLCJpc3MiOiJodHRwczovL2FwaS5pbnRyYW5ldC5wYXJpY3VzLmNvbSJ9.AHoAhOehVXiGXverbg40k6UqVA4Q8ZrPwzuKXgknSK8CyNjQuvQBjkx7dhZvlM--0_fzuqFGlLdBCDnuXWC6Zp4HGP1yKS_uOqMhun1lBwp8ri-lr75Mn2cxGSumOy3zyvqAWwZ6kA4P2AfZLZw6UmN76LvzZBUWr2HlThzSgwZ07yB1zb7gPI50hsfSt6X3u4hRRTbjO_LL69DliFBU_IYFJ2tqVssVgWWaSV_mvYHdOl_ATLpUq7bO7I8WDsWxQw5lQ4n1k6OptpNsV1QLG2rK9FPpf5G11l9nkRAKqDMMUc-c87_kYQa7AIWHWfPPJcY-mPhhgJ8U6LpX97lmMw
+// @Authentication Refresh Token
+
+## SUBMIT ANSWERS FOR EXAM
+// @no-cookie-jar
+GET {{hostname}}/api/v1/exams/user/class/50a23271-cf10-49c9-9cc8-bb1dc4a079c4
+Cookie: refreshToken={{refreshToken}}

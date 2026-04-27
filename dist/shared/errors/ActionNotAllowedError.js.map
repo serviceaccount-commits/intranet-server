@@ -1,0 +1,1 @@
+{"version":3,"file":"ActionNotAllowedError.js","sourceRoot":"","sources":["../../../src/shared/errors/ActionNotAllowedError.ts"],"names":[],"mappings":";;;AAAA,yCAAsC;AAEtC,MAAa,qBAAsB,SAAQ,mBAAQ;IACjD,YACE,UAAkB,gDAAgD;QAElE,KAAK,CAAC,OAAO,EAAE,GAAG,CAAC,CAAC;IACtB,CAAC;CACF;AAND,sDAMC"}

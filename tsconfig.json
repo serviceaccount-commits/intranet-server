@@ -1,0 +1,26 @@
+{
+  "extends": "@tsconfig/node-lts/tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,        // Good for catching unused variables
+    "noUnusedParameters": true,    // Good for catching unused parameters
+    "incremental": true, 
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+
+    // Explicitly set these, even though they are inherited
+    "target": "ES2022",
+    "sourceMap": true // Add source maps
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.spec.ts", "dist"] // Exclude dist
+}
