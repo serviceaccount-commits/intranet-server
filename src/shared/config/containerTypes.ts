@@ -1,0 +1,89 @@
+const TYPES = {
+  IRoleRepository: Symbol.for('IRoleRepository'),
+  IRoleService: Symbol.for('IRoleService'),
+
+  IPermissionRepository: Symbol.for('IPermissionRepository'),
+  IPermissionService: Symbol.for('IPermissionService'),
+
+  IUserRepository: Symbol.for('IUserRepository'),
+  IUserService: Symbol.for('IUserService'),
+
+  IDocumentRepository: Symbol.for('IDocumentRepository'),
+  IDocumentService: Symbol.for('IDocumentService'),
+
+  IUserReportsToRepository: Symbol.for('IUserReportsToRepository'),
+  IUserReportsToService: Symbol.for('IUserReportsToService'),
+
+  IAssignmentRepository: Symbol.for('IAssignmentRepository'),
+  IAssignmentService: Symbol.for('IAssignmentService'),
+
+  IClientRepository: Symbol.for('IClientRepository'),
+  IClientService: Symbol.for('IClientService'),
+
+  ITopicRepository: Symbol.for('ITopicRepository'),
+  ITopicService: Symbol.for('ITopicService'),
+
+  IArticleRepository: Symbol.for('IArticleRepository'),
+  IArticleService: Symbol.for('IArticleService'),
+
+  ITagRepository: Symbol.for('ITagRepository'),
+  ITagService: Symbol.for('ITagService'),
+
+  IAnnouncementRepository: Symbol.for('IAnnouncementRepository'),
+  IAnnouncementInboxService: Symbol.for('IAnnouncementInboxService'),
+  IAnnouncementManagementService: Symbol.for('IAnnouncementManagementService'),
+  IAnnouncementEngagementService: Symbol.for('IAnnouncementEngagementService'),
+
+  IAnnouncementAcknowledgementRepository: Symbol.for(
+    'IAnnouncementAcknowledgementRepository',
+  ),
+
+  IAnnouncementReadRepository: Symbol.for('IAnnouncementReadRepository'),
+
+  ICustomFieldRepository: Symbol.for('ICustomFieldRepository'),
+  ICustomFieldService: Symbol.for('ICustomFieldService'),
+
+  IStaffDirectoryOrderRepository: Symbol.for('IStaffDirectoryOrderRepository'),
+  IStaffDirectoryOrderService: Symbol.for('IStaffDirectoryOrderService'),
+
+  ICourseRepository: Symbol.for('ICourseRepository'),
+  ICourseService: Symbol.for('ICourseService'),
+  ICourseUserValueRepository: Symbol.for('ICourseUserValueRepository'),
+
+  ITrainingTopicRepository: Symbol.for('ITrainingTopicRepository'),
+  ITrainingTopicService: Symbol.for('ITrainingTopicService'),
+  ITrainingTopicUserValueRepository: Symbol.for(
+    'ITrainingTopicUserValueRepository',
+  ),
+
+  IClassRepository: Symbol.for('IClassRepository'),
+  IClassService: Symbol.for('IClassService'),
+  IClassUserValueRepository: Symbol.for('IClassUserValueRepository'),
+
+  IExamRepository: Symbol.for('IExamRepository'),
+  IExamAdminService: Symbol.for('IExamAdminService'),
+  IExamStudentService: Symbol.for('IExamStudentService'),
+  IExamStandaloneService: Symbol.for('IExamStandaloneService'),
+
+  IQuestionRepository: Symbol.for('IQuestionRepository'),
+  IQuestionService: Symbol.for('IQuestionService'),
+
+  IQuestionTypeRepository: Symbol.for('IQuestionTypeRepository'),
+  IQuestionTypeService: Symbol.for('IQuestionTypeService'),
+
+  IOptionRepository: Symbol.for('IOptionRepository'),
+  IOptionService: Symbol.for('IOptionService'),
+
+  IUserExamAttemptRepository: Symbol.for('IUserExamAttemptRepository'),
+  IUserExamAttemptService: Symbol.for('IUserExamAttemptService'),
+
+  IUserAnswerRepository: Symbol.for('IUserAnswerRepository'),
+
+  ICommentRepository: Symbol.for('ICommentRepository'),
+
+  ExternalValidationService: Symbol.for('ExternalValidationService'),
+
+  AuthService: Symbol.for('AuthService'),
+};
+
+export { TYPES };
