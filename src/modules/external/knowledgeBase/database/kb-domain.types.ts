@@ -38,6 +38,8 @@ export const KbArticleVersionSchema = z.object({
   version: z.number().int().positive(),
   // HTML content stored directly — replaces S3 + documents table
   content: z.string(),
+  // Plain text extracted from HTML — used for full-text search only, never rendered
+  content_text: z.string().optional(),
   // Storage backend — 'inline' = content is in this field, 's3'/'local' = content is a path/key
   content_storage: z.enum(['inline', 's3', 'local']).default('inline'),
   // Tag references (ObjectId of tags collection)

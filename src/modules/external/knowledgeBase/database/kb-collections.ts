@@ -62,11 +62,12 @@ async function setupArticleIndexes(db: Db): Promise<void> {
       name: 'article_version_id',
     },
     {
-      key: { 'versions.article_name': 'text', 'versions.article_synopsis': 'text' },
+      key: { 'versions.article_name': 'text', 'versions.article_synopsis': 'text', 'versions.content_text': 'text' },
       name: 'article_text_search',
       weights: {
         'versions.article_name': 10,
         'versions.article_synopsis': 5,
+        'versions.content_text': 1,
       },
     },
     {
