@@ -1,8 +1,42 @@
 import { logger } from './logger';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, TaskType } from '@google/generative-ai';
 import appConfig from '../config/appConfig';
 
 const genAI = new GoogleGenerativeAI(appConfig.geminiAIApiKey);
+
+export const EMBEDDING_MODEL = 'text-embedding-004';
+export const EMBEDDING_DIMENSIONS = 768;
+
+export type EmbeddingTask = 'document' | 'query';
+
+const taskTypeMap: Record<EmbeddingTask, TaskType> = {
+  document: TaskType.RETRIEVAL_DOCUMENT,
+  query: TaskType.RETRIEVAL_QUERY,
+};
+
+/** Returns a single embedding vector for the given text using Gemini's
+ *  text-embedding-004 model. Use task='document' at index time and
+ *  task='query' when embedding a search query. */
+export const getEmbedding = async (
+  text: string,
+  task: EmbeddingTask,
+): Promise<number[]> => {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error('getEmbedding called with empty text');
+  }
+  try {
+    const model = genAI.getGenerativeModel({ model: EMBEDDING_MODEL });
+    const result = await model.embedContent({
+      content: { role: 'user', parts: [{ text: trimmed }] },
+      taskType: taskTypeMap[task],
+    });
+    return result.embedding.values;
+  } catch (error) {
+    logger.error('Error in getEmbedding:', error);
+    throw error;
+  }
+};
 
 export const generateArticleSynopsis = async (
   articleContent: string,

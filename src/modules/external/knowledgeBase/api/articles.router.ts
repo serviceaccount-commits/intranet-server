@@ -6,6 +6,17 @@ const articleController = container.get<ArticleController>(ArticleController);
 
 const articlesRouter = Router();
 
+articlesRouter.get(
+  '/search',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await articleController.searchArticles(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 articlesRouter.post(
   '/',
   async (req: Request, res: Response, next: NextFunction) => {

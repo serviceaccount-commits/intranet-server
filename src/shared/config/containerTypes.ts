@@ -26,6 +26,10 @@ const TYPES = {
   IArticleRepository: Symbol.for('IArticleRepository'),
   IArticleService: Symbol.for('IArticleService'),
 
+  IArticleChunkRepository: Symbol.for('IArticleChunkRepository'),
+  IArticleChunkingService: Symbol.for('IArticleChunkingService'),
+  IArticleSearchService: Symbol.for('IArticleSearchService'),
+
   ITagRepository: Symbol.for('ITagRepository'),
   ITagService: Symbol.for('ITagService'),
 

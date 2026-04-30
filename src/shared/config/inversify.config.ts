@@ -44,6 +44,10 @@ import { ArticleRepository } from '../../modules/external/knowledgeBase/reposito
 import { IArticleService } from '../../modules/external/knowledgeBase/interfaces/articles/article.service.interface';
 import { ArticleService } from '../../modules/external/knowledgeBase/services/article.service';
 import { ArticleController } from '../../modules/external/knowledgeBase/controllers/articles.controller';
+import { IArticleChunkRepository } from '../../modules/external/knowledgeBase/interfaces/articles/articleChunk.repository.interface';
+import { ArticleChunkRepository } from '../../modules/external/knowledgeBase/repositories/articleChunk.repository';
+import { ArticleChunkingService } from '../../modules/external/knowledgeBase/services/articleChunking.service';
+import { ArticleSearchService } from '../../modules/external/knowledgeBase/services/articleSearch.service';
 import { ITagRepository } from '../../modules/external/knowledgeBase/interfaces/tags/tag.repository.interface';
 import { TagRepository } from '../../modules/external/knowledgeBase/repositories/tag.repository';
 import { ITagService } from '../../modules/external/knowledgeBase/interfaces/tags/tag.service.interface';
@@ -185,6 +189,17 @@ container
   .to(ArticleRepository);
 container.bind<IArticleService>(TYPES.IArticleService).to(ArticleService);
 container.bind<ArticleController>(ArticleController).toSelf();
+
+container
+  .bind<IArticleChunkRepository>(TYPES.IArticleChunkRepository)
+  .to(ArticleChunkRepository);
+container
+  .bind<ArticleChunkingService>(TYPES.IArticleChunkingService)
+  .to(ArticleChunkingService);
+container
+  .bind<ArticleSearchService>(TYPES.IArticleSearchService)
+  .to(ArticleSearchService)
+  .inSingletonScope();
 
 container.bind<ITagRepository>(TYPES.ITagRepository).to(TagRepository);
 container.bind<ITagService>(TYPES.ITagService).to(TagService);
