@@ -4,8 +4,8 @@ import appConfig from '../config/appConfig';
 
 const genAI = new GoogleGenerativeAI(appConfig.geminiAIApiKey);
 
-export const EMBEDDING_MODEL = 'text-embedding-004';
-export const EMBEDDING_DIMENSIONS = 768;
+export const EMBEDDING_MODEL = 'gemini-embedding-001';
+export const EMBEDDING_DIMENSIONS = 3072;
 
 export type EmbeddingTask = 'document' | 'query';
 
