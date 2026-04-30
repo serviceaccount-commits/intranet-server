@@ -17,6 +17,7 @@ import { QuestionType } from '../../modules/external/training/entities/QuestionT
 import { TrainingTopic } from '../../modules/external/training/entities/TrainingTopic.entity';
 import { TrainingTopicUserValue } from '../../modules/external/training/entities/TrainingTopicUserValue.entity';
 import { UserAnswer } from '../../modules/external/training/entities/UserAnswers.entity';
+import { StandaloneExam } from '../../modules/external/training/entities/StandaloneExam.entity';
 import { UserExamAttempt } from '../../modules/external/training/entities/UserExamAttempts.entity';
 import { Document } from '../../modules/internal/documents/entities/Document.entity';
 import { Assignment } from '../../modules/internal/users/entities/Assignment.entity';
@@ -49,6 +50,7 @@ export const ALL_ENTITIES = [
   TrainingTopic,
   TrainingTopicUserValue,
   UserAnswer,
+  StandaloneExam,
   UserExamAttempt,
   Document,
   Assignment,

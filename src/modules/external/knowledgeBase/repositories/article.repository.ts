@@ -1,5 +1,6 @@
 import { injectable } from 'inversify';
 import { ObjectId, UpdateFilter } from 'mongodb';
+import * as cheerio from 'cheerio';
 
 import {
   IArticleRepository,
@@ -23,7 +24,12 @@ export class ArticleRepository implements IArticleRepository {
     return getArticlesCollection(getMongoDb());
   }
 
-  // ─── Private helper ───────────────────────────────────────────────────────────
+  // ─── Private helpers ──────────────────────────────────────────────────────────
+
+  private htmlToText(html: string): string {
+    const $ = cheerio.load(html);
+    return $.root().text().replace(/\s+/g, ' ').trim();
+  }
 
   /** Converts a KbArticle root + one of its versions into a flat, serializable view. */
   private toView(article: KbArticle, version: KbArticleVersion): KbArticleVersionView {
@@ -143,6 +149,7 @@ export class ArticleRepository implements IArticleRepository {
       article_status: 'draft',
       version: 1,
       content,
+      content_text: this.htmlToText(content),
       content_storage: 'inline',
       tag_ids: [],
       created_by: userId,
@@ -199,6 +206,7 @@ export class ArticleRepository implements IArticleRepository {
       article_status: 'draft',
       version: latestVersionNumber + 1,
       content: options.useVersionAsTemplate ? templateVersion.content : '',
+      content_text: options.useVersionAsTemplate ? this.htmlToText(templateVersion.content) : '',
       content_storage: 'inline',
       tag_ids: options.useVersionAsTemplate ? [...templateVersion.tag_ids] : [],
       created_by: options.userId,
@@ -396,6 +404,7 @@ export class ArticleRepository implements IArticleRepository {
       {
         $set: {
           'versions.$.content': content,
+          'versions.$.content_text': this.htmlToText(content),
           'versions.$.updated_by': updatedBy,
           'versions.$.updated_by_name': updatedByName,
           'versions.$.updatedAt': now,
