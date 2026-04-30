@@ -56,6 +56,24 @@ export const KbArticleVersionSchema = z.object({
 
 export type KbArticleVersion = z.infer<typeof KbArticleVersionSchema>;
 
+// ─── Article Chunk (separate collection, one document per chunk) ──────────────
+
+export const KbArticleChunkSchema = z.object({
+  _id: z.instanceof(ObjectId),
+  article_id: z.instanceof(ObjectId),
+  version_id: z.instanceof(ObjectId),
+  chunk_index: z.number().int().nonnegative(),
+  content: z.string(),
+  content_hash: z.string().length(64), // sha256 hex
+  token_count: z.number().int().positive(),
+  embedding: z.array(z.number()),
+  embedding_model: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type KbArticleChunk = z.infer<typeof KbArticleChunkSchema>;
+
 // ─── Article (root document) ─────────────────────────────────────────────────
 
 export const KbArticleSchema = z.object({

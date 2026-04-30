@@ -1,11 +1,12 @@
 import { Db, Collection } from 'mongodb';
-import type { KbTag, KbArticle } from './kb-domain.types';
+import type { KbTag, KbArticle, KbArticleChunk } from './kb-domain.types';
 
 // ─── Collection names ─────────────────────────────────────────────────────────
 
 export const KB_COLLECTIONS = {
   TAGS: 'kb_tags',
   ARTICLES: 'kb_articles',
+  ARTICLE_CHUNKS: 'kb_article_chunks',
 } as const;
 
 // ─── Typed collection accessors ───────────────────────────────────────────────
@@ -18,12 +19,17 @@ export function getArticlesCollection(db: Db): Collection<KbArticle> {
   return db.collection<KbArticle>(KB_COLLECTIONS.ARTICLES);
 }
 
+export function getArticleChunksCollection(db: Db): Collection<KbArticleChunk> {
+  return db.collection<KbArticleChunk>(KB_COLLECTIONS.ARTICLE_CHUNKS);
+}
+
 // ─── Index setup ──────────────────────────────────────────────────────────────
 
 export async function setupKbCollections(db: Db): Promise<void> {
   await Promise.all([
     setupTagIndexes(db),
     setupArticleIndexes(db),
+    setupArticleChunkIndexes(db),
   ]);
 
 }
@@ -86,6 +92,27 @@ async function setupArticleIndexes(db: Db): Promise<void> {
     {
       key: { topic_id: 1, 'versions.article_status': 1, updatedAt: -1 },
       name: 'article_topic_status_recent',
+    },
+  ]);
+}
+
+// ─── Article chunk indexes ────────────────────────────────────────────────────
+
+async function setupArticleChunkIndexes(db: Db): Promise<void> {
+  const col = getArticleChunksCollection(db);
+
+  await col.createIndexes([
+    {
+      key: { version_id: 1, chunk_index: 1 },
+      name: 'chunk_version_order',
+    },
+    {
+      key: { article_id: 1 },
+      name: 'chunk_article_id',
+    },
+    {
+      key: { content_hash: 1 },
+      name: 'chunk_content_hash',
     },
   ]);
 }

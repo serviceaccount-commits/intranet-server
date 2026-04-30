@@ -26,6 +26,7 @@ import { MoveArticleInput, MoveArticleSchema } from '../schema/clients/MoveArtic
 import { CreateVersionInput, CreateVersionSchema } from '../schema/articles/CreateVersionSchema';
 import { generateArticleSynopsis } from '../../../../shared/utils/ai.service';
 import { ARTICLE_LOCK_DURATION_MS } from '../kb.constants';
+import { ArticleChunkingService } from './articleChunking.service';
 
 const KB_PERM_VIEW_METADATA = 'kb:article:view:metadata';
 
@@ -42,6 +43,8 @@ export class ArticleService implements IArticleService {
     private userRepository: IUserRepository,
     @inject(TYPES.ITagRepository)
     private tagRepository: ITagRepository,
+    @inject(TYPES.IArticleChunkingService)
+    private chunkingService: ArticleChunkingService,
   ) {}
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -70,7 +73,11 @@ export class ArticleService implements IArticleService {
     if (!topic) throw new NotFoundError('Topic', topicId);
 
     const updatedByName = `${user.first_name} ${user.last_name}`;
-    return this.articleRepository.createArticle(topicId, userId, articleName, content, updatedByName);
+    const created = await this.articleRepository.createArticle(topicId, userId, articleName, content, updatedByName);
+    if (content && content.trim()) {
+      await this.chunkingService.processVersionSafe(created.article_id, created.article_version_id, content);
+    }
+    return created;
   }
 
   async createVersion(
@@ -85,11 +92,15 @@ export class ArticleService implements IArticleService {
     const existing = await this.articleRepository.findByVersionId(data.versionId);
     if (!existing) throw new NotFoundError('Version', data.versionId);
 
-    return this.articleRepository.addVersion(data.versionId, {
+    const newVersion = await this.articleRepository.addVersion(data.versionId, {
       useVersionAsTemplate: data.useVersionAsTemplate,
       userId,
       updatedByName: `${user.first_name} ${user.last_name}`,
     });
+    if (data.useVersionAsTemplate && newVersion.content && newVersion.content.trim()) {
+      await this.chunkingService.processVersionSafe(newVersion.article_id, newVersion.article_version_id, newVersion.content);
+    }
+    return newVersion;
   }
 
   // ─── Content updates ──────────────────────────────────────────────────────────
@@ -107,6 +118,7 @@ export class ArticleService implements IArticleService {
 
     const updatedByName = user ? `${user.first_name} ${user.last_name}` : null;
     await this.articleRepository.updateVersionContent(versionId, content, userId, updatedByName);
+    await this.chunkingService.processVersionSafe(existing.article_id, versionId, content);
   }
 
   async updateArticleName(versionId: string, articleName: string): Promise<void> {

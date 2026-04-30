@@ -9,12 +9,44 @@ import { ZodError } from 'zod';
 import { AppError } from '../../../../shared/errors/AppError';
 import { MoveArticleInput } from '../schema/clients/MoveArticleSchema';
 import { CreateVersionInput } from '../schema/articles/CreateVersionSchema';
+import { ArticleSearchService } from '../services/articleSearch.service';
+import { ArticleStatus } from '../database/kb-domain.types';
 
 @injectable()
 export class ArticleController {
   constructor(
     @inject(TYPES.IArticleService) private articleService: IArticleService,
+    @inject(TYPES.IArticleSearchService) private searchService: ArticleSearchService,
   ) {}
+
+  async searchArticles(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.sendStatus(401);
+      return;
+    }
+
+    const q = typeof req.query['q'] === 'string' ? req.query['q'] : '';
+    if (!q.trim()) {
+      res.json({ hits: [] });
+      return;
+    }
+
+    const limitRaw = typeof req.query['limit'] === 'string' ? parseInt(req.query['limit'], 10) : NaN;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 20;
+
+    const statusesParam = typeof req.query['statuses'] === 'string' ? req.query['statuses'] : '';
+    const statuses = statusesParam
+      ? statusesParam.split(',').map((s) => s.trim()).filter(Boolean) as ArticleStatus[]
+      : undefined;
+
+    try {
+      const hits = await this.searchService.search(q, { limit, statuses });
+      res.json({ hits });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  }
 
   async createArticle(req: Request, res: Response) {
     const userId = req.user?.id;
