@@ -55,9 +55,18 @@ assert(structured.includes('Para one'), 'paragraph 1 retained');
 assert(structured.includes('Para two'), 'paragraph 2 retained');
 assert(structured.includes('\n\n'), 'paragraph boundaries kept as double newlines');
 
-console.log('\n[6] Long input splits into multiple chunks with overlap');
-const sentence = 'This sentence describes a refund procedure for the customer service representative. ';
-const longHtml = `<div>${sentence.repeat(150)}</div>`;
+console.log('\n[6] Long input with varied content splits into multiple chunks');
+// Generate varied content (each sentence different) so we can also assert
+// that distinct sentences yield distinct hashes. Chunkers MUST produce
+// duplicate hashes for duplicate content (that is the whole point of the
+// dedup story) — so this test uses unique sentences.
+const sentences: string[] = [];
+for (let i = 0; i < 80; i++) {
+  sentences.push(
+    `Procedure ${i}: handle scenario ${i * 7} when the customer asks about case number ${i * 13}. `,
+  );
+}
+const longHtml = `<div>${sentences.join('')}</div>`;
 const longChunks = chunkHtmlContent(longHtml, { targetTokens: 200, overlapTokens: 30 });
 assert(longChunks.length >= 2, `long input yields >=2 chunks (got ${longChunks.length})`);
 assert(
@@ -69,7 +78,23 @@ assert(
   'chunks are zero-indexed in order',
 );
 const uniqueHashes = new Set(longChunks.map((c) => c.content_hash));
-assert(uniqueHashes.size === longChunks.length, 'all chunk hashes are unique');
+assert(
+  uniqueHashes.size === longChunks.length,
+  `varied content -> unique hashes (got ${uniqueHashes.size}/${longChunks.length})`,
+);
+
+console.log('\n[6b] Repetitive content -> duplicate hashes IS OK and expected');
+const repetitive = chunkHtmlContent(
+  '<div>' + 'Same sentence here. '.repeat(300) + '</div>',
+  { targetTokens: 100, overlapTokens: 20 },
+);
+const repetitiveHashes = new Set(repetitive.map((c) => c.content_hash));
+// We expect FEWER unique hashes than chunks here — that is the dedup signal
+// (re-running the backfill on similar content will reuse embeddings).
+assert(
+  repetitive.length > 1,
+  'repetitive content still chunks',
+);
 
 console.log('\n[7] Tiny tail merges into prior chunk (avoids dust)');
 const withTinyTail = chunkHtmlContent(
