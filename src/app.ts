@@ -19,6 +19,8 @@ const frontendOrigin = appConfig.frontendUrl || 'http://localhost:5173';
 const corsOptions = {
   origin: [
     frontendOrigin,
+    'https://myparicus.paricus.com',
+    'https://www.myparicus.paricus.com',
     'http://localhost:3000',
     'http://localhost:8000',
     'http://localhost:8080',

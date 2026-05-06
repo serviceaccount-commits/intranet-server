@@ -20,6 +20,8 @@ export const io = new SocketIOServer<ServerToClientEvents>(httpServer, {
   cors: {
     origin: [
       appConfig.frontendUrl || 'http://localhost:5173',
+      'https://myparicus.paricus.com',
+      'https://www.myparicus.paricus.com',
       'http://localhost:5173',
       'http://localhost:5174',
     ],
