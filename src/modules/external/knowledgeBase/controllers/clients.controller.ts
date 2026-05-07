@@ -88,6 +88,7 @@ export class ClientController {
   async getExternalClients(_req: Request, res: Response) {
     const clients = await this.clientService.getClients();
     const minimal = clients
+      .filter((c) => c.client_shared_id)
       .map((c) => ({
         client_shared_id: c.client_shared_id,
         client_name: c.client_name,
