@@ -21,6 +21,8 @@ const corsOptions = {
     frontendOrigin,
     'https://myparicus.paricus.com',
     'https://www.myparicus.paricus.com',
+    'https://portal.paricus.com',
+    'https://qa-portal.paricus.com',
     'http://localhost:3000',
     'http://localhost:8000',
     'http://localhost:8080',

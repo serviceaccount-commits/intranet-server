@@ -22,6 +22,8 @@ export const io = new SocketIOServer<ServerToClientEvents>(httpServer, {
       appConfig.frontendUrl || 'http://localhost:5173',
       'https://myparicus.paricus.com',
       'https://www.myparicus.paricus.com',
+      'https://portal.paricus.com',
+      'https://qa-portal.paricus.com',
       'http://localhost:5173',
       'http://localhost:5174',
     ],

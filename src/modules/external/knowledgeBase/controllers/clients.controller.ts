@@ -84,4 +84,15 @@ export class ClientController {
 
     res.json(client);
   }
+
+  async getExternalClients(_req: Request, res: Response) {
+    const clients = await this.clientService.getClients();
+    const minimal = clients
+      .map((c) => ({
+        client_shared_id: c.client_shared_id,
+        client_name: c.client_name,
+      }))
+      .sort((a, b) => a.client_shared_id.localeCompare(b.client_shared_id));
+    res.json(minimal);
+  }
 }
