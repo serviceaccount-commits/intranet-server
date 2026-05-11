@@ -17,6 +17,20 @@ const GOOGLE_AUTH_OPTIONS = {
   scope: ['profile', 'email'],
 };
 
+// Whitelist of allowed frontend origins for OAuth redirect (prevents open redirect attacks)
+const ALLOWED_FRONTEND_ORIGINS = [
+  'https://myparicus.paricus.com',
+  'https://www.myparicus.paricus.com',
+  'https://qa-intranet.vercel.app',
+];
+
+const resolveFrontendOrigin = (candidate: unknown): string => {
+  if (typeof candidate === 'string' && ALLOWED_FRONTEND_ORIGINS.includes(candidate)) {
+    return candidate;
+  }
+  return appConfig.frontendUrl;
+};
+
 const authController = container.get<AuthController>(AuthController);
 const authService = container.get<AuthService>(TYPES.AuthService);
 const userService = container.get<UserService>(TYPES.IUserService);
@@ -31,18 +45,28 @@ const authRouter = Router();
 //   return null;
 // };
 
-authRouter.get('/google', passport.authenticate('google', GOOGLE_AUTH_OPTIONS));
+authRouter.get('/google', (req: Request, res: Response, next: NextFunction) => {
+  const returnTo = resolveFrontendOrigin(req.query['returnTo']);
+  passport.authenticate('google', {
+    ...GOOGLE_AUTH_OPTIONS,
+    state: returnTo,
+  })(req, res, next);
+});
 
 authRouter.get(
   '/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${appConfig.frontendUrl}/login?error=true`,
-    failWithError: true,
-    session: false,
-  }),
+  (req: Request, res: Response, next: NextFunction) => {
+    const frontendOrigin = resolveFrontendOrigin(req.query['state']);
+    passport.authenticate('google', {
+      failureRedirect: `${frontendOrigin}/login?error=true`,
+      failWithError: true,
+      session: false,
+    })(req, res, next);
+  },
   async (req: Request, res: Response, _next: NextFunction) => {
+    const frontendOrigin = resolveFrontendOrigin(req.query['state']);
     if (!req.user) {
-      return res.redirect(`${appConfig.frontendUrl}/login?error=true`);
+      return res.redirect(`${frontendOrigin}/login?error=true`);
     }
     const userPayload = req.user;
 
@@ -75,13 +99,13 @@ authRouter.get(
         sameSite: 'lax',
       });
 
-      res.redirect(`${appConfig.frontendUrl}/home`);
+      res.redirect(`${frontendOrigin}/home`);
     } catch (error) {
       logger.error(
         'Field to generate tokens or set cookies after Google auth: ',
         error,
       );
-      res.redirect(`${appConfig.frontendUrl}/login?error=true`);
+      res.redirect(`${frontendOrigin}/login?error=true`);
     }
   },
 );
