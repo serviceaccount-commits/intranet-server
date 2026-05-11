@@ -24,6 +24,7 @@ export const io = new SocketIOServer<ServerToClientEvents>(httpServer, {
       'https://www.myparicus.paricus.com',
       'https://portal.paricus.com',
       'https://qa-portal.paricus.com',
+      'https://qa-intranet.vercel.app',
       'http://localhost:5173',
       'http://localhost:5174',
     ],

@@ -23,6 +23,7 @@ const corsOptions = {
     'https://www.myparicus.paricus.com',
     'https://portal.paricus.com',
     'https://qa-portal.paricus.com',
+    'https://qa-intranet.vercel.app',
     'http://localhost:3000',
     'http://localhost:8000',
     'http://localhost:8080',
