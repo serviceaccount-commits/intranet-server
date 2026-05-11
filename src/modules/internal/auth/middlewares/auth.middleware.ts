@@ -15,7 +15,7 @@ const IS_PRODUCTION = appConfig.environment === 'production';
 const COOKIE_OPTION_BASE = {
   httpOnly: true,
   secure: IS_PRODUCTION,
-  sameSite: 'lax' as const,
+  sameSite: 'none' as const,
 };
 
 export const ACCESS_TOKEN_COOKIE_OPTIONS = {

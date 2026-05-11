@@ -41,9 +41,9 @@ export class AuthController {
       // 4. Set the new access token in the cookie
       res.cookie('accessToken', newAccessToken, {
         httpOnly: true,
-        secure: process.env['NODE_ENV'] === 'production',
+        secure: true,
         maxAge: accessTokenMaxAge,
-        sameSite: 'lax',
+        sameSite: 'none',
       });
 
       res.status(200).json({ message: 'Access token refreshed' });
