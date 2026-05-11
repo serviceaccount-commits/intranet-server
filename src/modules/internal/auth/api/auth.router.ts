@@ -87,16 +87,16 @@ authRouter.get(
 
       res.cookie('accessToken', accessToken, {
         httpOnly: true,
-        secure: process.env['NODE_ENV'] === 'production',
+        secure: true,
         maxAge: accessTokenMaxAge,
-        sameSite: 'lax',
+        sameSite: 'none',
       });
 
       res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
-        secure: process.env['NODE_ENV'] === 'production',
+        secure: true,
         maxAge: refreshTokenMaxAge,
-        sameSite: 'lax',
+        sameSite: 'none',
       });
 
       res.redirect(`${frontendOrigin}/home`);
