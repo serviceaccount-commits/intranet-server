@@ -648,4 +648,34 @@ export class ArticleRepository implements IArticleRepository {
 
     return this.toView(article, version);
   }
+
+  /** Returns every published (article_id, version_id, content) triple for the
+   *  maintenance re-chunking job. Optional `topicIds` scopes the result to a
+   *  client's topics; omit to walk the entire collection. */
+  async findAllPublishedVersionsForChunking(
+    topicIds?: string[],
+  ): Promise<Array<{ article_id: string; version_id: string; content: string }>> {
+    const match: Record<string, unknown> = { 'versions.article_status': 'published' };
+    if (topicIds && topicIds.length > 0) {
+      match['topic_id'] = { $in: topicIds };
+    }
+
+    const docs = await this.col
+      .aggregate([
+        { $match: match },
+        { $unwind: '$versions' },
+        { $match: { 'versions.article_status': 'published' } },
+        {
+          $project: {
+            _id: 0,
+            article_id: { $toString: '$_id' },
+            version_id: { $toString: '$versions._id' },
+            content: '$versions.content',
+          },
+        },
+      ])
+      .toArray();
+
+    return docs as Array<{ article_id: string; version_id: string; content: string }>;
+  }
 }

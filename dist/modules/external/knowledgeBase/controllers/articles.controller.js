@@ -532,6 +532,26 @@ let ArticleController = class ArticleController {
             next(error);
         }
     }
+    /** Maintenance: backfill chunk embeddings for every published version (or
+     *  a specific client's). Use when the search index is incomplete because
+     *  articles pre-date the chunker. Long-running: count + log when done. */
+    async reindexAllPublishedChunks(req, res, next) {
+        const clientSharedId = typeof req.query['clientSharedId'] === 'string'
+            ? req.query['clientSharedId']
+            : undefined;
+        try {
+            const result = await this.articleService.reindexAllPublishedChunks(clientSharedId);
+            return res.json({ ok: true, ...result });
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                return res
+                    .status(error.statusCode || 400)
+                    .json({ message: error.message });
+            }
+            next(error);
+        }
+    }
 };
 exports.ArticleController = ArticleController;
 exports.ArticleController = ArticleController = __decorate([

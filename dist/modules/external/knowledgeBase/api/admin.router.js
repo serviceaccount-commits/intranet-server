@@ -7,6 +7,16 @@ const articles_controller_1 = require("../controllers/articles.controller");
 const articleController = inversify_config_1.container.get(articles_controller_1.ArticleController);
 const adminRouter = (0, express_1.Router)();
 exports.adminRouter = adminRouter;
+// Static route declared before the `:clientSharedId` catch-all so it isn't
+// shadowed when the path happens to look like a shared id.
+adminRouter.post('/reindex', async (req, res, next) => {
+    try {
+        await articleController.reindexAllPublishedChunks(req, res, next);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 adminRouter.get('/:clientSharedId', async (req, res, next) => {
     try {
         await articleController.getAdminClientArticles(req, res, next);

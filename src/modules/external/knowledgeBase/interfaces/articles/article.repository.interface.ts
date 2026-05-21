@@ -126,4 +126,10 @@ export interface IArticleRepository {
     versionId: string,
     includeUnavailable?: boolean,
   ): Promise<KbArticleVersionView | null>;
+
+  /** Returns every published (article_id, version_id, content) triple for the
+   *  maintenance re-chunking job. */
+  findAllPublishedVersionsForChunking(
+    topicIds?: string[],
+  ): Promise<Array<{ article_id: string; version_id: string; content: string }>>;
 }

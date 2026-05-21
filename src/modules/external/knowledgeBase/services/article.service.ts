@@ -562,4 +562,47 @@ export class ArticleService implements IArticleService {
       content: view.content,
     };
   }
+
+  /** Re-runs the chunking + Gemini embedding pipeline across every published
+   *  version (or only those of a given client). Used to backfill the vector
+   *  index for articles that pre-date the chunker. Returns counts so callers
+   *  can confirm coverage. */
+  async reindexAllPublishedChunks(
+    clientSharedId?: string,
+  ): Promise<{ processed: number; failed: number; skipped: number }> {
+    let topicIds: string[] | undefined;
+    if (clientSharedId) {
+      topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+      if (topicIds.length === 0) {
+        return { processed: 0, failed: 0, skipped: 0 };
+      }
+    }
+
+    const versions =
+      await this.articleRepository.findAllPublishedVersionsForChunking(topicIds);
+
+    let processed = 0;
+    let failed = 0;
+    let skipped = 0;
+    for (const v of versions) {
+      if (!v.content || !v.content.trim()) {
+        skipped++;
+        continue;
+      }
+      try {
+        await this.chunkingService.processVersion(
+          v.article_id,
+          v.version_id,
+          v.content,
+        );
+        processed++;
+      } catch {
+        // chunkingService logs its own error; just count and move on so one
+        // bad article doesn't abort the rest of the backfill.
+        failed++;
+      }
+    }
+
+    return { processed, failed, skipped };
+  }
 }

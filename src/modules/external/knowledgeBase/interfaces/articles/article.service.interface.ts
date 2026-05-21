@@ -135,4 +135,8 @@ export interface IArticleService {
     clientSharedId: string,
     versionId: string,
   ): Promise<ExternalClientArticleDetail>;
+
+  reindexAllPublishedChunks(
+    clientSharedId?: string,
+  ): Promise<{ processed: number; failed: number; skipped: number }>;
 }
