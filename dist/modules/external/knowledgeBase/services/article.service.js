@@ -390,6 +390,7 @@ let ArticleService = class ArticleService {
                 article_name: h.article.article_name,
                 article_synopsis: h.article.article_synopsis,
                 updated_at: h.article.updatedAt,
+                _score: h.score,
             }));
         }
         const views = await this.articleRepository.findPublishedByTopicIds(topicIds, filters);
@@ -436,6 +437,7 @@ let ArticleService = class ArticleService {
                 article_name: h.article.article_name,
                 article_synopsis: h.article.article_synopsis,
                 updated_at: h.article.updatedAt,
+                _score: h.score,
             }));
         }
         const views = await this.articleRepository.findPublishedByTopicIds(topicIds, filters, true);

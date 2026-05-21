@@ -13,6 +13,9 @@ export interface ExternalClientArticle {
   article_name: string;
   article_synopsis: string;
   updated_at: Date;
+  /** Relevance score from the hybrid search service. Present only on
+   *  search responses; consumers can sort by this descending. */
+  _score?: number;
 }
 
 export interface ExternalClientArticleDetail {

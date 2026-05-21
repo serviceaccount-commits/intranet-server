@@ -464,6 +464,7 @@ export class ArticleService implements IArticleService {
         article_name: h.article.article_name,
         article_synopsis: h.article.article_synopsis,
         updated_at: h.article.updatedAt,
+        _score: h.score,
       }));
     }
 
@@ -521,6 +522,7 @@ export class ArticleService implements IArticleService {
         article_name: h.article.article_name,
         article_synopsis: h.article.article_synopsis,
         updated_at: h.article.updatedAt,
+        _score: h.score,
       }));
     }
 
