@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.documentsRouter = void 0;
+const logger_1 = require("../../../../shared/utils/logger");
 const express_1 = require("express");
 const multer_1 = __importDefault(require("multer"));
 // import path from 'path';
@@ -51,7 +52,7 @@ documentsRouter.get('/images/:imageKey', async (req, res) => {
         res.redirect(signedUrl);
     }
     catch (error) {
-        console.error(`Error generating signed URL for key: ${imageKey}`, error);
+        logger_1.logger.error(`Error generating signed URL for key: ${imageKey}`, error);
         // You can check for a 'NoSuchKey' error to send a more specific 404
         if (error.name === 'NoSuchKey') {
             res.status(404).send('Image not found.');

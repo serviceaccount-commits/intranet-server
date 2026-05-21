@@ -19,11 +19,38 @@ const BusinessLogicError_1 = require("../../../../shared/errors/BusinessLogicErr
 const FilterArticleSchema_1 = require("../schema/articles/FilterArticleSchema");
 const zod_1 = require("zod");
 const AppError_1 = require("../../../../shared/errors/AppError");
-const typeorm_1 = require("typeorm");
+const articleSearch_service_1 = require("../services/articleSearch.service");
 let ArticleController = class ArticleController {
     articleService;
-    constructor(articleService) {
+    searchService;
+    constructor(articleService, searchService) {
         this.articleService = articleService;
+        this.searchService = searchService;
+    }
+    async searchArticles(req, res) {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.sendStatus(401);
+            return;
+        }
+        const q = typeof req.query['q'] === 'string' ? req.query['q'] : '';
+        if (!q.trim()) {
+            res.json({ hits: [] });
+            return;
+        }
+        const limitRaw = typeof req.query['limit'] === 'string' ? parseInt(req.query['limit'], 10) : NaN;
+        const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 20;
+        const statusesParam = typeof req.query['statuses'] === 'string' ? req.query['statuses'] : '';
+        const statuses = statusesParam
+            ? statusesParam.split(',').map((s) => s.trim()).filter(Boolean)
+            : undefined;
+        try {
+            const hits = await this.searchService.search(q, { limit, statuses });
+            res.json({ hits });
+        }
+        catch (error) {
+            res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+        }
     }
     async createArticle(req, res) {
         const userId = req.user?.id;
@@ -147,7 +174,6 @@ let ArticleController = class ArticleController {
         const { articleId } = req.params;
         const userId = req.user?.id;
         if (!articleId || !userId) {
-            console.log('1 fail');
             res.sendStatus(400);
             return;
         }
@@ -219,19 +245,15 @@ let ArticleController = class ArticleController {
     async unpublishVersions(req, res) {
         const { articleIds } = req.body;
         const userId = req.user?.id;
-        console.log('articleIds', articleIds);
-        console.log('userId', userId);
         if (!articleIds || !userId) {
             res.sendStatus(400);
             return;
         }
         try {
             await this.articleService.unpublishVersions(articleIds);
-            console.log('ALL RIGHT');
             res.sendStatus(200);
         }
         catch (error) {
-            console.log('ALL WRONG');
             if (error instanceof BusinessLogicError_1.BusinessLogicError) {
                 return res.status(403).json({ message: error.message });
             }
@@ -276,8 +298,8 @@ let ArticleController = class ArticleController {
             res.sendStatus(400);
             return;
         }
-        const tag = await this.articleService.removeTagFromArticle(articleId, parseInt(tagId));
-        return res.json(tag);
+        await this.articleService.removeTagFromArticle(articleId, tagId);
+        return res.sendStatus(200);
     }
     async getArticles(req, res) {
         const { topicId } = req.params;
@@ -399,7 +421,7 @@ let ArticleController = class ArticleController {
             res.sendStatus(400);
             return;
         }
-        const article = await this.articleService.getArticleById(articleId);
+        const article = await this.articleService.getArticleWithDetails(articleId);
         return res.json(article);
     }
     async getArticleDocumentById(req, res) {
@@ -464,10 +486,48 @@ let ArticleController = class ArticleController {
         }
         catch (error) {
             if (error instanceof AppError_1.AppError) {
-                return res.status(400).json({ message: error.message });
+                return res.status(error.statusCode || 400).json({ message: error.message });
             }
-            if (error instanceof typeorm_1.QueryFailedError) {
-                return res.status(404).json({ message: 'Article not found' });
+            next(error);
+        }
+    }
+    // ─── Admin variants (no `available_for_client` filter) ───────────────────────
+    async getAdminClientArticles(req, res, next) {
+        const { clientSharedId } = req.params;
+        const validationResult = FilterArticleSchema_1.FilterArticleSchema.parse(req.query);
+        if (!clientSharedId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            const articles = await this.articleService.findAllPublishedByClientSharedId(validationResult, clientSharedId);
+            return res.json(articles);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                return res
+                    .status(error.statusCode || 400)
+                    .json({ message: error.message });
+            }
+            next(error);
+        }
+    }
+    async getAdminClientArticleDetails(req, res, next) {
+        const { clientSharedId } = req.params;
+        const { articleId } = req.params;
+        if (!clientSharedId || !articleId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            const article = await this.articleService.getArticleByExternalClientAndArticleIdAdmin(clientSharedId, articleId);
+            return res.json(article);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                return res
+                    .status(error.statusCode || 400)
+                    .json({ message: error.message });
             }
             next(error);
         }
@@ -477,6 +537,7 @@ exports.ArticleController = ArticleController;
 exports.ArticleController = ArticleController = __decorate([
     (0, inversify_1.injectable)(),
     __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleService)),
-    __metadata("design:paramtypes", [Object])
+    __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleSearchService)),
+    __metadata("design:paramtypes", [Object, articleSearch_service_1.ArticleSearchService])
 ], ArticleController);
 //# sourceMappingURL=articles.controller.js.map

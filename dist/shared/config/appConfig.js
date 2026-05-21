@@ -9,6 +9,7 @@ const EnvironmentError_1 = require("../errors/EnvironmentError");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const FileReadingError_1 = require("../errors/FileReadingError");
+const logger_1 = require("../utils/logger");
 dotenv_1.default.config();
 const readKeyFile = (filePath) => {
     if (!filePath) {
@@ -19,7 +20,7 @@ const readKeyFile = (filePath) => {
         return fs_1.default.readFileSync(absolutePath, 'utf8');
     }
     catch (error) {
-        console.error(`Error reading key file at ${filePath}: `, error);
+        logger_1.logger.error(`Error reading key file at ${filePath}: `, error);
         throw new FileReadingError_1.FileReadingError(`Could not read JWT key file: ${filePath}`);
     }
 };
@@ -27,16 +28,18 @@ const loadConfig = () => {
     const config = {
         port: parseInt(process.env['PORT'] || '3000', 10),
         internalApiKey: process.env['INTERNAL_API_KEY'] || '',
+        internalAdminApiKey: process.env['INTERNAL_ADMIN_API_KEY'] || '',
         environment: process.env['NODE_ENV'] || 'development',
         frontendUrl: process.env['FRONTEND_URL'] || 'http://localhost:5173',
         cookieSecret: process.env['COOKIE_SECRET'] || 'default_cookie_secret_change_me',
         backendUrl: process.env['BACKEND_URL'] || 'http://localhost:3000',
-        searchSimilarityThreshold: process.env['SEARCH_SIMILARITY_THRESHOLD']
-            ? parseFloat(process.env['SEARCH_SIMILARITY_THRESHOLD'])
-            : 0.67,
         geminiAIApiKey: process.env['GEMINI_AI_API_KEY'] || '',
         s3BucketName: process.env['S3_BUCKET_NAME'] || '',
         awsRegion: process.env['AWS_REGION'] || '',
+        mongodb: {
+            uri: process.env['MONGODB_URI'] || 'mongodb://localhost:27017',
+            dbName: process.env['MONGODB_DB_NAME'] || 'paricus_kb',
+        },
         jwt: {
             privateKey: readKeyFile(process.env['JWT_PRIVATE_KEY_PATH']),
             publicKey: readKeyFile(process.env['JWT_PUBLIC_KEY_PATH']),
@@ -54,7 +57,7 @@ const loadConfig = () => {
             audience: process.env['JWT_VERIFY_EMAIL_AUDIENCE'] || 'IntranetApp',
         },
         googleOAuth: {
-            cliendID: process.env['GOOGLE_OAUTH_CLIENT_ID'] || '',
+            clientId: process.env['GOOGLE_OAUTH_CLIENT_ID'] || '',
             clientSecret: process.env['GOOGLE_OAUTH_CLIENT_SECRET'] || '',
             callbackURL: process.env['GOOGLE_OAUTH_CALLBACK_URL'] || '',
         },
@@ -63,9 +66,9 @@ const loadConfig = () => {
         throw new EnvironmentError_1.EnvironmentError('JWT private or public key is missing');
     }
     if (config.cookieSecret === 'default_cookie_secret_change_me') {
-        console.warn('WARNING: Default COOKIE_SECRET in use. Please set a strong secret the .env file.');
+        logger_1.logger.warn('WARNING: Default COOKIE_SECRET in use. Please set a strong secret the .env file.');
     }
-    if (!config.googleOAuth.cliendID ||
+    if (!config.googleOAuth.clientId ||
         !config.googleOAuth.clientSecret ||
         !config.googleOAuth.callbackURL) {
         throw new EnvironmentError_1.EnvironmentError('Google OAuth credentials are missing');
@@ -94,7 +97,7 @@ exports.qaDatabaseConfig = {
     password: process.env['DATABASE_PASSWORD'],
     database: process.env['DATABASE_NAME'],
     entities: [__dirname + '/../../modules/**/*.entity{.ts,.js}'], // Important: Path to your entities
-    synchronize: true, // NEVER set to true in production!
+    synchronize: false, // NEVER set to true in production!
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'], // Path to migrations
     logging: process.env['NODE_ENV'] === 'development', // Log SQL queries in development
     // ... other options ...
@@ -108,7 +111,7 @@ exports.prodDatabaseConfig = {
     password: process.env['DATABASE_PASSWORD'],
     database: process.env['DATABASE_NAME'],
     entities: [__dirname + '/../../modules/**/*.entity{.ts,.js}'], // Important: Path to your entities
-    synchronize: true, // NEVER set to true in production!
+    synchronize: false, // NEVER set to true in production!
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'], // Path to migrations
     logging: process.env['NODE_ENV'] === 'development', // Log SQL queries in development
     // ... other options ...

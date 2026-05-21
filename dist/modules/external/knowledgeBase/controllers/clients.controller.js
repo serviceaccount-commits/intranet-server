@@ -69,7 +69,6 @@ let ClientController = class ClientController {
             return;
         }
         const clients = await this.clientService.getClientsByAccess(userId);
-        console.log(clients);
         res.json(clients);
     }
     async getClientById(req, res) {
@@ -80,6 +79,17 @@ let ClientController = class ClientController {
         }
         const client = await this.clientService.getClientById(clientId);
         res.json(client);
+    }
+    async getExternalClients(_req, res) {
+        const clients = await this.clientService.getClients();
+        const minimal = clients
+            .filter((c) => c.client_shared_id)
+            .map((c) => ({
+            client_shared_id: c.client_shared_id,
+            client_name: c.client_name,
+        }))
+            .sort((a, b) => a.client_shared_id.localeCompare(b.client_shared_id));
+        res.json(minimal);
     }
 };
 exports.ClientController = ClientController;

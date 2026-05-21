@@ -23,7 +23,9 @@ import { optionsRouter } from '../modules/external/training/api/options.router';
 import { authRouter } from '../modules/internal/auth/api/auth.router';
 import { externalRouter } from '../modules/external/knowledgeBase/api/external.router';
 import { externalClientsRouter } from '../modules/external/knowledgeBase/api/external-clients.router';
+import { adminRouter } from '../modules/external/knowledgeBase/api/admin.router';
 import { verifyApiKey } from '../modules/internal/auth/middlewares/apiKey.middleware';
+import { verifyAdminApiKey } from '../modules/internal/auth/middlewares/adminApiKey.middleware';
 import { documentsRouter } from '../modules/internal/documents/api/documents.router';
 import { authenticateJWT } from '../modules/internal/auth/middlewares/auth.middleware';
 
@@ -50,6 +52,7 @@ apiLayerRouter.use('/v1/questionTypes', authenticateJWT, questionTypesRouter);
 apiLayerRouter.use('/v1/options', authenticateJWT, optionsRouter);
 apiLayerRouter.use('/v1/external/articles', verifyApiKey, externalRouter);
 apiLayerRouter.use('/v1/external/clients', verifyApiKey, externalClientsRouter);
+apiLayerRouter.use('/v1/external/admin/articles', verifyAdminApiKey, adminRouter);
 apiLayerRouter.use('/v1/auth', authRouter);
 apiLayerRouter.use('/v1/documents', documentsRouter);
 

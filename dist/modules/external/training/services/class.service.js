@@ -38,9 +38,10 @@ let ClassService = class ClassService {
     trainingTopicUserValueRepository;
     classUserValueRepository;
     documentService;
-    examService;
+    examAdminService;
+    examStudentService;
     examRepository;
-    constructor(classRepository, courseRepository, userRepository, trainingTopicRepository, commentRepository, trainingTopicUserValueRepository, classUserValueRepository, documentService, examService, examRepository) {
+    constructor(classRepository, courseRepository, userRepository, trainingTopicRepository, commentRepository, trainingTopicUserValueRepository, classUserValueRepository, documentService, examAdminService, examStudentService, examRepository) {
         this.classRepository = classRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
@@ -49,7 +50,8 @@ let ClassService = class ClassService {
         this.trainingTopicUserValueRepository = trainingTopicUserValueRepository;
         this.classUserValueRepository = classUserValueRepository;
         this.documentService = documentService;
-        this.examService = examService;
+        this.examAdminService = examAdminService;
+        this.examStudentService = examStudentService;
         this.examRepository = examRepository;
     }
     async createClass(input) {
@@ -138,15 +140,12 @@ let ClassService = class ClassService {
                 let countChange = 0;
                 if (classStatus === ES_1.default.DRAFT && newStatus === ES_1.default.PUBLISHED) {
                     countChange = 1;
-                    console.log('it is now published');
                 }
                 else if (classStatus === ES_1.default.DRAFT && newStatus === ES_1.default.ARCHIVED) {
                     countChange = 0;
-                    console.log('it is now archived');
                 }
                 else if (classStatus === ES_1.default.PUBLISHED && newStatus === ES_1.default.DRAFT) {
                     countChange = -1;
-                    console.log('it is now draft');
                 }
                 else if (classStatus === ES_1.default.PUBLISHED && newStatus === ES_1.default.ARCHIVED)
                     countChange = -1;
@@ -172,7 +171,7 @@ let ClassService = class ClassService {
             await this.documentService.uploadDocumentToS3(existingClass.document_id, 'classes', validatedData.content);
             // IF NAME CHANGED UPDATE ALL EXAMS UNDER THIS CLASS TO GET THE NAME TO "Exam For ${newClassName}"
             if (nameChanged) {
-                const allExams = await this.examService.getAllClassExams(classId);
+                const allExams = await this.examAdminService.getAllClassExams(classId);
                 let examsToSave = [];
                 for (const exam of allExams) {
                     exam.exam_title = `Exam for ${validatedData.className}`;
@@ -236,7 +235,6 @@ let ClassService = class ClassService {
             0;
             throw new NotFoundError_1.NotFoundError('Class User Value', classId);
         }
-        console.log(userValue);
         // const fileContent = await this.documentService.getLocalDocument(
         //   classEntity.document_id,
         //   'classes',
@@ -248,7 +246,7 @@ let ClassService = class ClassService {
                 content: fileContent,
                 userValue: userValue,
             },
-            userExamStatus: await this.examService.getUserExamStatus(classId, userId),
+            userExamStatus: await this.examStudentService.getUserExamStatus(classId, userId),
         };
     }
     async addCommentToClass(classId, input) {
@@ -309,8 +307,9 @@ exports.ClassService = ClassService = __decorate([
     __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.ITrainingTopicUserValueRepository)),
     __param(6, (0, inversify_1.inject)(containerTypes_1.TYPES.IClassUserValueRepository)),
     __param(7, (0, inversify_1.inject)(containerTypes_1.TYPES.IDocumentService)),
-    __param(8, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamService)),
-    __param(9, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamRepository)),
-    __metadata("design:paramtypes", [Object, Object, Object, Object, Object, Object, Object, Object, Object, Object])
+    __param(8, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamAdminService)),
+    __param(9, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamStudentService)),
+    __param(10, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamRepository)),
+    __metadata("design:paramtypes", [Object, Object, Object, Object, Object, Object, Object, Object, Object, Object, Object])
 ], ClassService);
 //# sourceMappingURL=class.service.js.map

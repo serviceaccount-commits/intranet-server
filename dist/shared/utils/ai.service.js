@@ -3,27 +3,37 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateArticleSynopsis = exports.getEmbedding = void 0;
+exports.generateArticleSynopsis = exports.getEmbedding = exports.EMBEDDING_DIMENSIONS = exports.EMBEDDING_MODEL = void 0;
+const logger_1 = require("./logger");
 const generative_ai_1 = require("@google/generative-ai");
-const BusinessLogicError_1 = require("../errors/BusinessLogicError");
 const appConfig_1 = __importDefault(require("../config/appConfig"));
 const genAI = new generative_ai_1.GoogleGenerativeAI(appConfig_1.default.geminiAIApiKey);
-const EMBEDDING_MODEL = 'text-embedding-004';
-/**
- * Converts HTML content to clean text and generates a vector embedding.
- * @param htmlContent The HTML string from CKEditor.
- * @returns A promise that resolves to the vector embedding.
- */
-const getEmbedding = async (text) => {
-    // The existing cleanup logic will normalize all whitespace into single spaces.
-    const cleanText = text.trim();
-    if (cleanText === '') {
-        throw new BusinessLogicError_1.BusinessLogicError('Invalid input format');
+exports.EMBEDDING_MODEL = 'gemini-embedding-001';
+exports.EMBEDDING_DIMENSIONS = 3072;
+const taskTypeMap = {
+    document: generative_ai_1.TaskType.RETRIEVAL_DOCUMENT,
+    query: generative_ai_1.TaskType.RETRIEVAL_QUERY,
+};
+/** Returns a single embedding vector for the given text using Gemini's
+ *  text-embedding-004 model. Use task='document' at index time and
+ *  task='query' when embedding a search query. */
+const getEmbedding = async (text, task) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+        throw new Error('getEmbedding called with empty text');
     }
-    const model = genAI.getGenerativeModel({ model: EMBEDDING_MODEL });
-    const result = await model.embedContent(cleanText);
-    const embedding = result.embedding;
-    return embedding.values;
+    try {
+        const model = genAI.getGenerativeModel({ model: exports.EMBEDDING_MODEL });
+        const result = await model.embedContent({
+            content: { role: 'user', parts: [{ text: trimmed }] },
+            taskType: taskTypeMap[task],
+        });
+        return result.embedding.values;
+    }
+    catch (error) {
+        logger_1.logger.error('Error in getEmbedding:', error);
+        throw error;
+    }
 };
 exports.getEmbedding = getEmbedding;
 const generateArticleSynopsis = async (articleContent) => {
@@ -49,7 +59,7 @@ const generateArticleSynopsis = async (articleContent) => {
         return text.trim();
     }
     catch (error) {
-        console.error('Error in generateArticleSynopsis:', error);
+        logger_1.logger.error('Error in generateArticleSynopsis:', error);
         throw error;
     }
 };

@@ -12,14 +12,13 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const logger_1 = require("../../../../shared/utils/logger");
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const CreateUserSchema_1 = require("../schema/users/CreateUserSchema");
 const zod_1 = require("zod");
 const FilterUserSchema_1 = require("../schema/users/FilterUserSchema");
 const BusinessValidationError_1 = require("../../../../shared/errors/BusinessValidationError");
-const BusinessLogicError_1 = require("../../../../shared/errors/BusinessLogicError");
-const AppError_1 = require("../../../../shared/errors/AppError");
 let UserController = class UserController {
     userService;
     constructor(userService) {
@@ -57,8 +56,7 @@ let UserController = class UserController {
                     errors: error.errors,
                 });
             }
-            console.error(error);
-            console.log('error instance: ', error instanceof BusinessValidationError_1.BusinessValidationError, ' ', error instanceof BusinessLogicError_1.BusinessLogicError, ' ', error instanceof AppError_1.AppError);
+            logger_1.logger.error('Unexpected error in UserController:', error);
             return res
                 .status(500)
                 .json({ message: 'An internal server error ocurred.' });
@@ -74,7 +72,7 @@ let UserController = class UserController {
             res.sendStatus(200);
         }
         catch (error) {
-            console.error(error);
+            logger_1.logger.error('Unexpected error in UserController:', error);
             return res
                 .status(500)
                 .json({ message: 'An internal server error ocurred.' });
@@ -157,7 +155,6 @@ let UserController = class UserController {
         try {
             const { userId } = req.params;
             if (!userId) {
-                console.log('error 8');
                 return res.status(400).json({ error: 'Invalid user id' });
             }
             const input = req.body;
@@ -172,12 +169,9 @@ let UserController = class UserController {
                 });
             }
             if (error instanceof zod_1.ZodError) {
-                console.log('error 9');
                 return res.status(400).json(error);
             }
             if (error instanceof Error) {
-                console.log('error 10');
-                console.log(error);
                 return res.status(400).json({ message: error.message });
             }
         }
@@ -186,7 +180,6 @@ let UserController = class UserController {
         try {
             const { userId } = req.params;
             if (!userId) {
-                console.log('error 8');
                 return res.status(400).json({ error: 'Invalid user id' });
             }
             const deletedUser = await this.userService.deleteUser(userId);
@@ -200,12 +193,9 @@ let UserController = class UserController {
                 });
             }
             if (error instanceof zod_1.ZodError) {
-                console.log('error 9');
                 return res.status(400).json(error);
             }
             if (error instanceof Error) {
-                console.log('error 10');
-                console.log(error);
                 return res.status(400).json({ message: error.message });
             }
         }

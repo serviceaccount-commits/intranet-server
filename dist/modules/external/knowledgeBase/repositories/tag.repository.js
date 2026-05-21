@@ -8,36 +8,42 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TagRepository = void 0;
 const inversify_1 = require("inversify");
-const data_source_1 = require("../../../../shared/database/data-source");
-const Tag_entity_1 = require("../entities/Tag.entity");
-const typeorm_1 = require("typeorm");
+const mongodb_1 = require("mongodb");
+const kb_collections_1 = require("../database/kb-collections");
+const mongo_connection_1 = require("../../../../shared/database/mongo-connection");
 let TagRepository = class TagRepository {
-    async create(tag) {
-        return await data_source_1.AppDataSource.manager.save(tag);
+    get col() {
+        return (0, kb_collections_1.getTagsCollection)((0, mongo_connection_1.getMongoDb)());
+    }
+    async create(input) {
+        const now = new Date();
+        const doc = {
+            _id: new mongodb_1.ObjectId(),
+            tag_name: input.tag_name.trim(),
+            createdAt: now,
+            updatedAt: now,
+        };
+        await this.col.insertOne(doc);
+        return doc;
     }
     async findAll() {
-        return await data_source_1.AppDataSource.manager.find(Tag_entity_1.Tag);
+        return this.col.find({}).sort({ tag_name: 1 }).toArray();
     }
     async findById(id) {
-        return await data_source_1.AppDataSource.manager.findOne(Tag_entity_1.Tag, {
-            where: {
-                tag_id: id,
-            },
-        });
+        if (!mongodb_1.ObjectId.isValid(id))
+            return null;
+        return this.col.findOne({ _id: new mongodb_1.ObjectId(id) });
     }
     async findByIds(ids) {
-        return await data_source_1.AppDataSource.manager.find(Tag_entity_1.Tag, {
-            where: {
-                tag_id: (0, typeorm_1.In)(ids),
-            },
-        });
+        const oids = ids
+            .filter((id) => mongodb_1.ObjectId.isValid(id))
+            .map((id) => new mongodb_1.ObjectId(id));
+        if (oids.length === 0)
+            return [];
+        return this.col.find({ _id: { $in: oids } }).toArray();
     }
-    async findByName(tagName) {
-        return await data_source_1.AppDataSource.manager.findOne(Tag_entity_1.Tag, {
-            where: {
-                tag_name: tagName,
-            },
-        });
+    async findByName(name) {
+        return this.col.findOne({ tag_name: name }, { collation: { locale: 'en', strength: 2 } });
     }
 };
 exports.TagRepository = TagRepository;

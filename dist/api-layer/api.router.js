@@ -11,7 +11,7 @@ const topics_router_1 = require("../modules/external/knowledgeBase/api/topics.ro
 const articles_router_1 = require("../modules/external/knowledgeBase/api/articles.router");
 const tags_router_1 = require("../modules/external/knowledgeBase/api/tags.router");
 const announcements_router_1 = require("../modules/external/announcements/api/announcements.router");
-const assignments_router_copy_1 = require("../modules/internal/users/api/assignments.router copy");
+const customFields_router_1 = require("../modules/internal/users/api/customFields.router");
 const staffDirectoryOrders_router_1 = require("../modules/external/humanResources/api/staffDirectoryOrders.router");
 const courses_router_1 = require("../modules/external/training/api/courses.router");
 const trainingTopics_router_1 = require("../modules/external/training/api/trainingTopics.router");
@@ -23,7 +23,10 @@ const questionTypes_router_1 = require("../modules/external/training/api/questio
 const options_router_1 = require("../modules/external/training/api/options.router");
 const auth_router_1 = require("../modules/internal/auth/api/auth.router");
 const external_router_1 = require("../modules/external/knowledgeBase/api/external.router");
+const external_clients_router_1 = require("../modules/external/knowledgeBase/api/external-clients.router");
+const admin_router_1 = require("../modules/external/knowledgeBase/api/admin.router");
 const apiKey_middleware_1 = require("../modules/internal/auth/middlewares/apiKey.middleware");
+const adminApiKey_middleware_1 = require("../modules/internal/auth/middlewares/adminApiKey.middleware");
 const documents_router_1 = require("../modules/internal/documents/api/documents.router");
 const auth_middleware_1 = require("../modules/internal/auth/middlewares/auth.middleware");
 const apiLayerRouter = (0, express_1.Router)();
@@ -36,7 +39,7 @@ apiLayerRouter.use('/v1/topics', auth_middleware_1.authenticateJWT, topics_route
 apiLayerRouter.use('/v1/articles', auth_middleware_1.authenticateJWT, articles_router_1.articlesRouter);
 apiLayerRouter.use('/v1/tags', auth_middleware_1.authenticateJWT, tags_router_1.tagsRouter);
 apiLayerRouter.use('/v1/announcements', auth_middleware_1.authenticateJWT, announcements_router_1.announcementsRouter);
-apiLayerRouter.use('/v1/customFields', auth_middleware_1.authenticateJWT, assignments_router_copy_1.customFieldsRouter);
+apiLayerRouter.use('/v1/customFields', auth_middleware_1.authenticateJWT, customFields_router_1.customFieldsRouter);
 apiLayerRouter.use('/v1/sd-order', auth_middleware_1.authenticateJWT, staffDirectoryOrders_router_1.sdOrderRouter);
 apiLayerRouter.use('/v1/courses', auth_middleware_1.authenticateJWT, courses_router_1.courseRouter);
 apiLayerRouter.use('/v1/training-topics', auth_middleware_1.authenticateJWT, trainingTopics_router_1.topicRouter);
@@ -47,6 +50,8 @@ apiLayerRouter.use('/v1/questions', auth_middleware_1.authenticateJWT, questions
 apiLayerRouter.use('/v1/questionTypes', auth_middleware_1.authenticateJWT, questionTypes_router_1.questionTypesRouter);
 apiLayerRouter.use('/v1/options', auth_middleware_1.authenticateJWT, options_router_1.optionsRouter);
 apiLayerRouter.use('/v1/external/articles', apiKey_middleware_1.verifyApiKey, external_router_1.externalRouter);
+apiLayerRouter.use('/v1/external/clients', apiKey_middleware_1.verifyApiKey, external_clients_router_1.externalClientsRouter);
+apiLayerRouter.use('/v1/external/admin/articles', adminApiKey_middleware_1.verifyAdminApiKey, admin_router_1.adminRouter);
 apiLayerRouter.use('/v1/auth', auth_router_1.authRouter);
 apiLayerRouter.use('/v1/documents', documents_router_1.documentsRouter);
 exports.default = apiLayerRouter;

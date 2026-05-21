@@ -37,13 +37,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.verifyApiKey = void 0;
+const logger_1 = require("../../../../shared/utils/logger");
 const crypto = __importStar(require("crypto"));
 const appConfig_1 = __importDefault(require("../../../../shared/config/appConfig"));
 const API_KEY = appConfig_1.default.internalApiKey;
 const verifyApiKey = async (req, res, next) => {
     if (!API_KEY) {
         // This is a server configuration error, not a client error.
-        console.error('INTERNAL_API_KEY is not set in environment variables.');
+        logger_1.logger.error('INTERNAL_API_KEY is not set in environment variables.');
         res.status(500).json({ message: 'Internal Server Error' });
         return;
     }

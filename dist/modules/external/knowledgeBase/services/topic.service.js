@@ -14,13 +14,11 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TopicService = void 0;
 const inversify_1 = require("inversify");
-const data_source_1 = require("../../../../shared/database/data-source");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
-const Topic_entity_1 = require("../entities/Topic.entity");
-const CreateTopicSchema_1 = require("../schema/topics/CreateTopicSchema");
-const UpdateTopicSchema_1 = require("../schema/topics/UpdateTopicSchema");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 const AuthenticationError_1 = require("../../../../shared/errors/AuthenticationError");
+const CreateTopicSchema_1 = require("../schema/topics/CreateTopicSchema");
+const UpdateTopicSchema_1 = require("../schema/topics/UpdateTopicSchema");
 let TopicService = class TopicService {
     topicRepository;
     clientRepository;
@@ -31,44 +29,37 @@ let TopicService = class TopicService {
         this.userRepository = userRepository;
     }
     async createTopic(input) {
-        const validatedData = CreateTopicSchema_1.CreateTopicSchema.parse(input);
-        const userId = validatedData.userId;
-        if (!userId) {
+        const data = CreateTopicSchema_1.CreateTopicSchema.parse(input);
+        if (!data.userId)
             throw new AuthenticationError_1.AuthenticationError('User not authenticated.');
-        }
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const user = await this.userRepository.findUserById(userId);
-            if (!user) {
-                throw new NotFoundError_1.NotFoundError('User', validatedData.userId);
-            }
-            const existingClient = await this.clientRepository.findById(validatedData.clientId);
-            if (!existingClient) {
-                throw new NotFoundError_1.NotFoundError('Client', validatedData.clientId);
-            }
-            const newTopic = new Topic_entity_1.Topic();
-            newTopic.topic_name = validatedData.topicName;
-            return await this.topicRepository.create(newTopic, existingClient, user);
+        const user = await this.userRepository.findUserById(data.userId);
+        if (!user)
+            throw new NotFoundError_1.NotFoundError('User', data.userId);
+        const client = await this.clientRepository.findById(data.clientId);
+        if (!client)
+            throw new NotFoundError_1.NotFoundError('Client', data.clientId);
+        return this.topicRepository.create({
+            topic_name: data.topicName,
+            topic_edit_available: true,
+            client_id: client.client_id,
+            user_id: data.userId,
         });
     }
     async updateTopic(input) {
-        const validatedData = UpdateTopicSchema_1.UpdateTopicSchema.parse(input);
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const topic = await this.topicRepository.findById(validatedData.topicId);
-            if (!topic) {
-                throw new NotFoundError_1.NotFoundError('Topic', validatedData.topicId);
-            }
-            topic.topic_name = validatedData.topicName;
-            return await this.topicRepository.save(topic);
-        });
+        const data = UpdateTopicSchema_1.UpdateTopicSchema.parse(input);
+        const topic = await this.topicRepository.findById(data.topicId);
+        if (!topic)
+            throw new NotFoundError_1.NotFoundError('Topic', data.topicId);
+        topic.topic_name = data.topicName;
+        return this.topicRepository.save(topic);
     }
     async getTopics(clientId) {
-        return await this.topicRepository.findAllByClientId(clientId);
+        return this.topicRepository.findAllByClientId(clientId);
     }
     async getTopicById(topicId) {
         const topic = await this.topicRepository.findById(topicId);
-        if (!topic) {
-            throw new Error(`Topic with id ${topicId} does not exist.`);
-        }
+        if (!topic)
+            throw new NotFoundError_1.NotFoundError('Topic', topicId);
         return topic;
     }
 };

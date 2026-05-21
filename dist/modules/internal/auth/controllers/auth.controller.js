@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
+const logger_1 = require("../../../../shared/utils/logger");
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const auth_service_1 = require("../services/auth.service");
@@ -27,7 +28,6 @@ let AuthController = class AuthController {
         if (!refreshToken) {
             return res.status(401).json({ message: 'Refresh token not found' });
         }
-        console.log('REFRESH TOKEN: ', refreshToken);
         try {
             const payload = this.authService.verifyToken(refreshToken); //
             if (!payload) {
@@ -47,14 +47,14 @@ let AuthController = class AuthController {
             // 4. Set the new access token in the cookie
             res.cookie('accessToken', newAccessToken, {
                 httpOnly: true,
-                secure: process.env['NODE_ENV'] === 'production',
+                secure: true,
                 maxAge: accessTokenMaxAge,
-                sameSite: 'lax',
+                sameSite: 'none',
             });
             res.status(200).json({ message: 'Access token refreshed' });
         }
         catch (error) {
-            console.error('Error refreshing token:', error);
+            logger_1.logger.error('Error refreshing token:', error);
             res.status(500).json({ message: 'Could not refresh token' });
         }
     }

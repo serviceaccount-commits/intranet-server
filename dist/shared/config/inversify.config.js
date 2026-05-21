@@ -32,11 +32,16 @@ const topics_controller_1 = require("../../modules/external/knowledgeBase/contro
 const article_repository_1 = require("../../modules/external/knowledgeBase/repositories/article.repository");
 const article_service_1 = require("../../modules/external/knowledgeBase/services/article.service");
 const articles_controller_1 = require("../../modules/external/knowledgeBase/controllers/articles.controller");
+const articleChunk_repository_1 = require("../../modules/external/knowledgeBase/repositories/articleChunk.repository");
+const articleChunking_service_1 = require("../../modules/external/knowledgeBase/services/articleChunking.service");
+const articleSearch_service_1 = require("../../modules/external/knowledgeBase/services/articleSearch.service");
 const tag_repository_1 = require("../../modules/external/knowledgeBase/repositories/tag.repository");
 const tag_service_1 = require("../../modules/external/knowledgeBase/services/tag.service");
 const tags_controller_1 = require("../../modules/external/knowledgeBase/controllers/tags.controller");
 const announcement_repository_1 = require("../../modules/external/announcements/repositories/announcement.repository");
-const announcement_service_1 = require("../../modules/external/announcements/services/announcement.service");
+const announcement_inbox_service_1 = require("../../modules/external/announcements/services/announcement-inbox.service");
+const announcement_management_service_1 = require("../../modules/external/announcements/services/announcement-management.service");
+const announcement_engagement_service_1 = require("../../modules/external/announcements/services/announcement-engagement.service");
 const announcements_controller_1 = require("../../modules/external/announcements/controllers/announcements.controller");
 const announcementAcknowledgement_repository_1 = require("../../modules/external/announcements/repositories/announcementAcknowledgement.repository");
 const customField_repository_1 = require("../../modules/internal/users/repositories/customField.repository");
@@ -63,7 +68,9 @@ const auth_service_1 = require("../../modules/internal/auth/services/auth.servic
 const auth_controller_1 = require("../../modules/internal/auth/controllers/auth.controller");
 const exams_controller_1 = require("../../modules/external/training/controllers/exams.controller");
 const exam_repository_1 = require("../../modules/external/training/repositories/exam.repository");
-const exam_service_1 = require("../../modules/external/training/services/exam.service");
+const exam_admin_service_1 = require("../../modules/external/training/services/exam-admin.service");
+const exam_student_service_1 = require("../../modules/external/training/services/exam-student.service");
+const exam_standalone_service_1 = require("../../modules/external/training/services/exam-standalone.service");
 const question_repository_1 = require("../../modules/external/training/repositories/question.repository");
 const question_service_1 = require("../../modules/external/training/services/question.service");
 const questions_controller_1 = require("../../modules/external/training/controllers/questions.controller");
@@ -125,15 +132,25 @@ container
     .to(article_repository_1.ArticleRepository);
 container.bind(containerTypes_1.TYPES.IArticleService).to(article_service_1.ArticleService);
 container.bind(articles_controller_1.ArticleController).toSelf();
+container
+    .bind(containerTypes_1.TYPES.IArticleChunkRepository)
+    .to(articleChunk_repository_1.ArticleChunkRepository);
+container
+    .bind(containerTypes_1.TYPES.IArticleChunkingService)
+    .to(articleChunking_service_1.ArticleChunkingService);
+container
+    .bind(containerTypes_1.TYPES.IArticleSearchService)
+    .to(articleSearch_service_1.ArticleSearchService)
+    .inSingletonScope();
 container.bind(containerTypes_1.TYPES.ITagRepository).to(tag_repository_1.TagRepository);
 container.bind(containerTypes_1.TYPES.ITagService).to(tag_service_1.TagService);
 container.bind(tags_controller_1.TagController).toSelf();
 container
     .bind(containerTypes_1.TYPES.IAnnouncementRepository)
     .to(announcement_repository_1.AnnouncementRepository);
-container
-    .bind(containerTypes_1.TYPES.IAnnouncementService)
-    .to(announcement_service_1.AnnouncementService);
+container.bind(containerTypes_1.TYPES.IAnnouncementInboxService).to(announcement_inbox_service_1.AnnouncementInboxService);
+container.bind(containerTypes_1.TYPES.IAnnouncementManagementService).to(announcement_management_service_1.AnnouncementManagementService);
+container.bind(containerTypes_1.TYPES.IAnnouncementEngagementService).to(announcement_engagement_service_1.AnnouncementEngagementService);
 container.bind(announcements_controller_1.AnnouncementController).toSelf();
 container
     .bind(containerTypes_1.TYPES.IAnnouncementAcknowledgementRepository)
@@ -188,7 +205,9 @@ container
     .bind(containerTypes_1.TYPES.ICommentRepository)
     .to(comment_repository_1.CommentRepository);
 container.bind(containerTypes_1.TYPES.IExamRepository).to(exam_repository_1.ExamRepository);
-container.bind(containerTypes_1.TYPES.IExamService).to(exam_service_1.ExamService);
+container.bind(containerTypes_1.TYPES.IExamAdminService).to(exam_admin_service_1.ExamAdminService);
+container.bind(containerTypes_1.TYPES.IExamStudentService).to(exam_student_service_1.ExamStudentService);
+container.bind(containerTypes_1.TYPES.IExamStandaloneService).to(exam_standalone_service_1.ExamStandaloneService);
 container.bind(exams_controller_1.ExamController).toSelf();
 container
     .bind(containerTypes_1.TYPES.IQuestionRepository)

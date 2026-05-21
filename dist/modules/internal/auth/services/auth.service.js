@@ -10,6 +10,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
+const logger_1 = require("../../../../shared/utils/logger");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const appConfig_1 = __importDefault(require("../../../../shared/config/appConfig"));
 const inversify_1 = require("inversify");
@@ -24,7 +25,6 @@ let AuthService = class AuthService {
             issuer: this.jwtConfig.issuer,
             audience: this.jwtConfig.audience,
         };
-        console.log('payload is: ', payload);
         return jsonwebtoken_1.default.sign(payload, this.jwtConfig.privateKey, options);
     }
     generateRefreshToken(payload) {
@@ -48,10 +48,7 @@ let AuthService = class AuthService {
                 issuer: this.jwtConfig.issuer,
                 audience: this.jwtConfig.audience,
             };
-            console.log('decoded is now about to go: ');
             const decoded = jsonwebtoken_1.default.verify(token, this.jwtConfig.publicKey, options);
-            console.log(token);
-            console.log('decoded is: ', decoded);
             return {
                 id: decoded.id,
                 username: decoded.username,
@@ -60,11 +57,11 @@ let AuthService = class AuthService {
         }
         catch (error) {
             if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
-                console.error('JWT Token Expired: ', error.message);
+                logger_1.logger.error('JWT Token Expired: ', error.message);
                 return null;
             }
             if (error instanceof jsonwebtoken_1.default.JsonWebTokenError) {
-                console.error('JWT Invalid Token: ', error.message);
+                logger_1.logger.error('JWT Invalid Token: ', error.message);
                 return null;
             }
             return null;
@@ -86,7 +83,7 @@ let AuthService = class AuthService {
             return token;
         }
         catch (error) {
-            console.error('Error signing the verification token:', error);
+            logger_1.logger.error('Error signing the verification token:', error);
             throw new Error('Could not sign the verification token.');
         }
     }

@@ -9,12 +9,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ExternalValidationService = void 0;
 const inversify_1 = require("inversify");
 let ExternalValidationService = class ExternalValidationService {
-    async isEmailValid(email) {
-        console.log(`Validating email: ${email}`);
+    async isEmailValid(_email) {
         return true;
     }
-    async isPhoneNumberValid(phone) {
-        console.log(`Validating phone: ${phone}`);
+    async isPhoneNumberValid(_phone) {
         return true;
     }
 };

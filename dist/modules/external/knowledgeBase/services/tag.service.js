@@ -14,33 +14,28 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TagService = void 0;
 const inversify_1 = require("inversify");
-const data_source_1 = require("../../../../shared/database/data-source");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
-const Tag_entity_1 = require("../entities/Tag.entity");
+const ConflictError_1 = require("../../../../shared/errors/ConflictError");
+const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 let TagService = class TagService {
     tagRepository;
     constructor(tagRepository) {
         this.tagRepository = tagRepository;
     }
     async createTag(tagName) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const existingTag = await this.tagRepository.findByName(tagName);
-            if (existingTag) {
-                throw new Error(`Tag with name ${tagName} already exists.`);
-            }
-            const newTag = new Tag_entity_1.Tag();
-            newTag.tag_name = tagName;
-            return await this.tagRepository.create(newTag);
-        });
+        const existing = await this.tagRepository.findByName(tagName);
+        if (existing) {
+            throw new ConflictError_1.ConflictError(`Tag "${tagName}" already exists.`);
+        }
+        return this.tagRepository.create({ tag_name: tagName });
     }
     async getTags() {
-        return await this.tagRepository.findAll();
+        return this.tagRepository.findAll();
     }
     async getTagById(tagId) {
         const tag = await this.tagRepository.findById(tagId);
-        if (!tag) {
-            throw new Error(`Tag with id ${tagId} does not exist.`);
-        }
+        if (!tag)
+            throw new NotFoundError_1.NotFoundError('Tag', tagId);
         return tag;
     }
 };

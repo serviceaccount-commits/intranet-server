@@ -627,4 +627,68 @@ export class ArticleController {
       next(error);
     }
   }
+
+  // ─── Admin variants (no `available_for_client` filter) ───────────────────────
+
+  async getAdminClientArticles(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    const { clientSharedId } = req.params;
+    const validationResult = FilterArticleSchema.parse(req.query);
+
+    if (!clientSharedId) {
+      res.sendStatus(400);
+      return;
+    }
+
+    try {
+      const articles =
+        await this.articleService.findAllPublishedByClientSharedId(
+          validationResult,
+          clientSharedId,
+        );
+
+      return res.json(articles);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res
+          .status(error.statusCode || 400)
+          .json({ message: error.message });
+      }
+      next(error);
+    }
+  }
+
+  async getAdminClientArticleDetails(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    const { clientSharedId } = req.params;
+    const { articleId } = req.params;
+
+    if (!clientSharedId || !articleId) {
+      res.sendStatus(400);
+      return;
+    }
+
+    try {
+      const article =
+        await this.articleService.getArticleByExternalClientAndArticleIdAdmin(
+          clientSharedId,
+          articleId,
+        );
+
+      return res.json(article);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res
+          .status(error.statusCode || 400)
+          .json({ message: error.message });
+      }
+      next(error);
+    }
+  }
 }

@@ -471,4 +471,52 @@ export class ArticleService implements IArticleService {
       content: view.content,
     };
   }
+
+  // ─── Admin variants (ignore `available_for_client` flag) ─────────────────────
+
+  async findAllPublishedByClientSharedId(
+    filters: FilterArticleInput,
+    clientSharedId: string,
+  ): Promise<ExternalClientArticle[]> {
+    const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+    if (topicIds.length === 0) return [];
+
+    const views = await this.articleRepository.findPublishedByTopicIds(
+      topicIds,
+      filters,
+      true,
+    );
+
+    return views.map((v) => ({
+      article_id: v.article_version_id,
+      article_name: v.article_name,
+      article_synopsis: v.article_synopsis,
+      updated_at: v.updatedAt,
+    }));
+  }
+
+  async getArticleByExternalClientAndArticleIdAdmin(
+    clientSharedId: string,
+    versionId: string,
+  ): Promise<ExternalClientArticleDetail> {
+    const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+    if (topicIds.length === 0) throw new NotFoundError('Client', clientSharedId);
+
+    const view = await this.articleRepository.findPublishedVersionByTopicIds(
+      topicIds,
+      versionId,
+      true,
+    );
+    if (!view) throw new NotFoundError('Article', versionId);
+
+    return {
+      article: {
+        article_id: view.article_version_id,
+        article_name: view.article_name,
+        article_synopsis: view.article_synopsis,
+        updated_at: view.updatedAt,
+      },
+      content: view.content,
+    };
+  }
 }

@@ -35,8 +35,8 @@ let CourseService = class CourseService {
     trainingTopicRepository;
     classRepository;
     classValueRepository;
-    examService;
-    constructor(courseRepository, userRepository, courseValueRepository, trainingTopicValueRepository, trainingTopicRepository, classRepository, classValueRepository, examService) {
+    examStudentService;
+    constructor(courseRepository, userRepository, courseValueRepository, trainingTopicValueRepository, trainingTopicRepository, classRepository, classValueRepository, examStudentService) {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.courseValueRepository = courseValueRepository;
@@ -44,7 +44,7 @@ let CourseService = class CourseService {
         this.trainingTopicRepository = trainingTopicRepository;
         this.classRepository = classRepository;
         this.classValueRepository = classValueRepository;
-        this.examService = examService;
+        this.examStudentService = examStudentService;
     }
     async createCourse(input) {
         const validatedData = CreateCourseSchema_1.CreateCourseSchema.parse(input);
@@ -117,11 +117,9 @@ let CourseService = class CourseService {
             const newUserIdSet = new Set(newUserIds);
             // process exisiting records: Deactivate those no longer in the new list
             for (const currentValue of currentCourseValues) {
-                console.log('it works here');
                 if (currentValue.user_availability_status === ES_1.default.ACTIVE &&
                     !newUserIdSet.has(currentValue.user_id)) {
                     currentValue.user_availability_status = ES_1.default.INACTIVE;
-                    console.log('NOW THERE IS SOME INACTIVE COURSE_USER_VALUE');
                     courseValuesToSave.push(currentValue);
                 }
                 else if (currentValue.user_availability_status === ES_1.default.INACTIVE &&
@@ -157,7 +155,6 @@ let CourseService = class CourseService {
                     newCourseUserValue.course_id = course.course_id;
                     newCourseUserValue.user_availability_status = ES_1.default.ACTIVE;
                     courseValuesToSave.push(newCourseUserValue);
-                    console.log('Now we have course value for user: ', userId);
                     // b) create TrainingTopicUserValue and ClassUserValue for the user
                     for (const trainingTopic of trainingTopics) {
                         const classesForThisTopic = classesByTopicId.get(trainingTopic.topic_id) || [];
@@ -237,8 +234,6 @@ let CourseService = class CourseService {
         const courseIds = courseUserValues.map((cuv) => cuv.course_id);
         // 2 get all ACTIVE topics for these specific courses
         const topicsByCourse = await this.trainingTopicRepository.findActiveTopicsGroupedByCourse(courseIds);
-        console.log('TOPICS BY COURSE:');
-        console.log(topicsByCourse);
         // 3 get all trainingTopicUserValue progress records for this user and these courses
         const trainingTopicUserValues = await this.trainingTopicValueRepository.findByUserIdAndCourseIds(userId, courseIds);
         // 4 map trainingTopicUserValue progress
@@ -250,19 +245,15 @@ let CourseService = class CourseService {
             });
         });
         // 5 calculate progress for each course
-        console.log('NO COURSE USER VALUES');
         const results = [];
         for (const cuv of courseUserValues) {
             const course = cuv.course;
             const courseId = course.course_id;
             const totalTopics = topicsByCourse.get(courseId)?.length || 0;
             let completedTopics = 0;
-            console.log('THERE ARE COURSE USER VALUES');
             if (totalTopics > 0) {
-                console.log('TOTAL TOPICS GREATER THAN 0 for course: ', cuv.course.course_name);
                 const topicsInThisCourse = topicsByCourse.get(courseId) || [];
                 for (const topic of topicsInThisCourse) {
-                    console.log(topic.topic_name);
                     const progress = trainingTopicUserValueProgressMap.get(topic.topic_id);
                     if (progress &&
                         progress.total > 0 &&
@@ -288,11 +279,8 @@ let CourseService = class CourseService {
     }
     async getCourseTopicsWithProgress(userId, courseId) {
         const courseUserValue = await this.courseValueRepository.findByCourseIdAndUserId(courseId, userId);
-        console.log('COURSE USER VALUE: ');
-        console.log(courseUserValue);
         if (!courseUserValue ||
             courseUserValue.user_availability_status !== ES_1.default.ACTIVE) {
-            console.log('NOT FOUND');
             throw new NotFoundError_1.NotFoundError('Course', courseId);
         }
         // get all topicUserValue records for this user and course
@@ -305,9 +293,7 @@ let CourseService = class CourseService {
                 ? Math.round((completedClasses / totalClasses) * 100)
                 : 0;
             const classExamValues = await Promise.all(tuv.classValues.map(async (cuv) => {
-                const examData = await this.examService.getUserExamNoAttemptLimit(cuv.class.class_id, userId);
-                console.log('EXAM DATA: ');
-                console.log(examData);
+                const examData = await this.examStudentService.getUserExamNoAttemptLimit(cuv.class.class_id, userId);
                 return {
                     classUserValue: cuv,
                     examData: examData,
@@ -321,7 +307,6 @@ let CourseService = class CourseService {
                 completionPercentage: completionPercentage,
             };
         }));
-        console.log('uyeaah');
         return results;
     }
 };
@@ -335,7 +320,7 @@ exports.CourseService = CourseService = __decorate([
     __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.ITrainingTopicRepository)),
     __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.IClassRepository)),
     __param(6, (0, inversify_1.inject)(containerTypes_1.TYPES.IClassUserValueRepository)),
-    __param(7, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamService)),
+    __param(7, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamStudentService)),
     __metadata("design:paramtypes", [Object, Object, Object, Object, Object, Object, Object, Object])
 ], CourseService);
 //# sourceMappingURL=course.service.js.map

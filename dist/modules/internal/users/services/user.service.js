@@ -22,6 +22,8 @@ const User_entity_1 = require("../entities/User.entity");
 const data_source_1 = require("../../../../shared/database/data-source");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const UserDetail_entity_1 = require("../entities/UserDetail.entity");
+const typeorm_1 = require("typeorm");
+const Client_entity_1 = require("../../../external/knowledgeBase/entities/Client.entity");
 const CreateUserSchema_1 = require("../schema/users/CreateUserSchema");
 const UpdateUserSchema_1 = require("../schema/users/UpdateUserSchema");
 const externalValidation_service_1 = require("./externalValidation.service");
@@ -29,18 +31,15 @@ const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 const InvalidDataFormatError_1 = require("../../../../shared/errors/InvalidDataFormatError");
 const BusinessValidationError_1 = require("../../../../shared/errors/BusinessValidationError");
 const googleapis_1 = require("googleapis");
-const path_1 = __importDefault(require("path"));
 let UserService = class UserService {
     userRepository;
     roleRepository;
-    clientRepository;
     assignmentRepository;
     externalValidationService;
     userReportsToService;
-    constructor(userRepository, roleRepository, clientRepository, assignmentRepository, externalValidationService, userReportsToService) {
+    constructor(userRepository, roleRepository, assignmentRepository, externalValidationService, userReportsToService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
-        this.clientRepository = clientRepository;
         this.assignmentRepository = assignmentRepository;
         this.externalValidationService = externalValidationService;
         this.userReportsToService = userReportsToService;
@@ -57,7 +56,7 @@ let UserService = class UserService {
         // personal email
         if (input.personalEmail &&
             (!currentUser ||
-                input.personalEmail === currentUser.userDetails.personal_phone)) {
+                input.personalEmail === currentUser.userDetails.personal_email)) {
             const isEmailValid = await this.externalValidationService.isEmailValid(input.personalEmail);
             if (!isEmailValid) {
                 businessErrors['personalEmail'] =
@@ -105,7 +104,9 @@ let UserService = class UserService {
             let clients = [];
             if (validatedData.clientIds !== undefined) {
                 if (validatedData.clientIds.length > 0) {
-                    const clientsFound = await this.clientRepository.findByIds(validatedData.clientIds);
+                    const clientsFound = await data_source_1.AppDataSource.getRepository(Client_entity_1.Client).find({
+                        where: { client_id: (0, typeorm_1.In)(validatedData.clientIds) },
+                    });
                     if (clientsFound.length !== validatedData.clientIds.length) {
                         throw new NotFoundError_1.NotFoundError('Client(s)');
                     }
@@ -143,7 +144,6 @@ let UserService = class UserService {
             if (existingByWorkPhone)
                 businessErrors['workPhone'] = 'Work phone is already in use.';
             if (Object.keys(businessErrors).length > 0) {
-                console.log('THROWING BUSINESS VALIDATION ERROR');
                 throw new BusinessValidationError_1.BusinessValidationError('Business validation failed.', businessErrors);
             }
             const newUserDetails = new UserDetail_entity_1.UserDetails();
@@ -199,7 +199,7 @@ let UserService = class UserService {
         }
         return user;
     }
-    async getUserProfileById(userId, withNoPhoneNumberCode) {
+    async getUserProfileById(userId, _withNoPhoneNumberCode) {
         const user = await this.userRepository.findUserProfileById(userId);
         const userReportsToRelationships = await this.userRepository.findUserReportsToRelationships(userId);
         if (!user) {
@@ -208,7 +208,6 @@ let UserService = class UserService {
         let workNumber = user.work_phone;
         let personalNumber = user.userDetails.personal_phone;
         let emergencyContactNumber = user.userDetails.emergency_contact_phone;
-        console.log(withNoPhoneNumberCode);
         // if (user.work_phone && withNoPhoneNumberCode) {
         //   const original = user.work_phone;
         //   const firstSpaceIndex = original.indexOf(' ');
@@ -268,7 +267,6 @@ let UserService = class UserService {
         const validatedData = UpdateUserSchema_1.UpdateUserSchema.parse(input);
         const user = await this.userRepository.findUserById(userId);
         if (!user) {
-            console.log('error 1');
             throw new NotFoundError_1.NotFoundError('User', userId);
         }
         // TODO: ADD ERROR COLLECTOR AND RETURN MULTIPLE BUSINESS LOGIC ERRORS.
@@ -276,7 +274,6 @@ let UserService = class UserService {
         return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
             const user = await this.userRepository.findUserById(userId);
             if (!user) {
-                console.log('error 2');
                 throw new NotFoundError_1.NotFoundError('User', userId);
             }
             if (validatedData.workEmail !== undefined &&
@@ -334,8 +331,6 @@ let UserService = class UserService {
                     }
                 }
                 if (Object.keys(businessErrors).length > 0) {
-                    console.log('THROWING BUSINESS VALIDATION ERROR');
-                    console.log('error 3');
                     throw new BusinessValidationError_1.BusinessValidationError('Business validation failed.', businessErrors);
                 }
                 if (validatedData.personalEmail !== undefined) {
@@ -372,7 +367,6 @@ let UserService = class UserService {
                 if (validatedData.hireDate !== undefined) {
                     const hiredDate = new Date(validatedData.hireDate);
                     if (isNaN(hiredDate.getTime())) {
-                        console.log('error 4');
                         throw new InvalidDataFormatError_1.InvalidDataFormatError('hireDate');
                     }
                     userDetails.hire_date = hiredDate;
@@ -386,7 +380,6 @@ let UserService = class UserService {
                 user.role_id !== validatedData.roleId) {
                 const role = await this.roleRepository.findById(validatedData.roleId);
                 if (!role) {
-                    console.log('error 5');
                     throw new NotFoundError_1.NotFoundError('Role', validatedData.roleId);
                 }
                 user.role = role;
@@ -394,9 +387,10 @@ let UserService = class UserService {
             }
             if (validatedData.clientIds !== undefined) {
                 if (validatedData.clientIds.length > 0) {
-                    const clients = await this.clientRepository.findByIds(validatedData.clientIds);
+                    const clients = await data_source_1.AppDataSource.getRepository(Client_entity_1.Client).find({
+                        where: { client_id: (0, typeorm_1.In)(validatedData.clientIds) },
+                    });
                     if (clients.length !== validatedData.clientIds.length) {
-                        console.log('error 6');
                         throw new NotFoundError_1.NotFoundError('Client(s)');
                     }
                     user.clients = clients;
@@ -408,12 +402,10 @@ let UserService = class UserService {
             if (validatedData.assignmentIds !== undefined) {
                 const assignmentsFound = await this.assignmentRepository.findByIds(validatedData.assignmentIds);
                 if (assignmentsFound.length !== validatedData.assignmentIds.length) {
-                    console.log('error 7');
                     throw new NotFoundError_1.NotFoundError('Assignment(s)');
                 }
                 user.assignments = assignmentsFound;
             }
-            console.log('REPORTS TO: ', validatedData.reportsToId);
             if (validatedData.reportsToId &&
                 validatedData.reportsToId !== ES_1.default.NO_REPORTS_TO) {
                 await this.userReportsToService.updateUserReportsTo(user.user_id, validatedData.reportsToId);
@@ -442,8 +434,19 @@ let UserService = class UserService {
         if (!user) {
             throw new NotFoundError_1.NotFoundError('User', userId);
         }
-        // const keyFilePath = path_1.default.join(__dirname, '..', '..', '..', '..', '..', 'intranetserviceaccount-012f39dadb99.json');
-        const keyFilePath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        // const keyFilePath = path.join(
+        //   __dirname,
+        //   '..',
+        //   '..',
+        //   '..',
+        //   '..',
+        //   '..',
+        //   'intranetserviceaccount-012f39dadb99.json',
+        // );
+        const keyFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
+        if (!keyFilePath) {
+            throw new Error('Missing GOOGLE_APPLICATION_CREDENTIALS in .env');
+        }
         const auth = new googleapis_1.google.auth.GoogleAuth({
             keyFile: keyFilePath,
             scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
@@ -463,7 +466,6 @@ let UserService = class UserService {
         });
         const rows = response.data.values;
         if (!rows || rows.length === 0) {
-            console.log('No data found.');
             return [];
         }
         const rankingData = [];
@@ -487,7 +489,6 @@ let UserService = class UserService {
             });
         }
         rankingData.sort((a, b) => a.rank - b.rank);
-        console.log(rankingData);
         return rankingData;
     }
 };
@@ -496,10 +497,9 @@ exports.UserService = UserService = __decorate([
     (0, inversify_1.injectable)(),
     __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserRepository)),
     __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IRoleRepository)),
-    __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IClientRepository)),
-    __param(3, (0, inversify_1.inject)(containerTypes_1.TYPES.IAssignmentRepository)),
-    __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.ExternalValidationService)),
-    __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserReportsToService)),
-    __metadata("design:paramtypes", [Object, Object, Object, Object, externalValidation_service_1.ExternalValidationService, Object])
+    __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IAssignmentRepository)),
+    __param(3, (0, inversify_1.inject)(containerTypes_1.TYPES.ExternalValidationService)),
+    __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserReportsToService)),
+    __metadata("design:paramtypes", [Object, Object, Object, externalValidation_service_1.ExternalValidationService, Object])
 ], UserService);
 //# sourceMappingURL=user.service.js.map

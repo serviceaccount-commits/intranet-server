@@ -54,8 +54,6 @@ let TrainingTopicRepository = class TrainingTopicRepository {
                 course_id: 'ASC',
             },
         });
-        console.log('FOUND TRAINING TOPICS');
-        console.log(trainingTopics);
         // group the results by course_id
         for (const topic of trainingTopics) {
             if (!groupedTopics.has(topic.course_id)) {

@@ -16,6 +16,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DocumentController = void 0;
+const logger_1 = require("../../../../shared/utils/logger");
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const uuid_1 = require("uuid");
@@ -46,7 +47,7 @@ let DocumentController = class DocumentController {
             });
         }
         catch (error) {
-            console.error('Failed to upload image:', error);
+            logger_1.logger.error('Failed to upload image:', error);
             res
                 .status(500)
                 .json({ error: 'An error occurred while uploading the file.' });

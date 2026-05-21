@@ -14,27 +14,31 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AnnouncementController = void 0;
 const inversify_1 = require("inversify");
+const zod_1 = require("zod");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const FilterInboxAnnouncementSchema_1 = require("../schema/FilterInboxAnnouncementSchema");
-const zod_1 = require("zod");
 const FilterSentAnnouncementSchema_1 = require("../schema/FilterSentAnnouncementSchema");
 const FilterAnnouncementReportSchema_1 = require("../schema/FilterAnnouncementReportSchema");
 const convertToCsv_1 = require("../../../../shared/utils/convertToCsv");
 const getFormattedDate_1 = require("../../../../shared/utils/getFormattedDate");
 let AnnouncementController = class AnnouncementController {
-    announcementService;
-    constructor(announcementService) {
-        this.announcementService = announcementService;
+    inboxService;
+    managementService;
+    engagementService;
+    constructor(inboxService, managementService, engagementService) {
+        this.inboxService = inboxService;
+        this.managementService = managementService;
+        this.engagementService = engagementService;
     }
+    // ─── Management ───────────────────────────────────────────────────────────────
     async createAnnouncement(req, res) {
-        //! should update userId so that it gets retrieved via jwt cookie
         const input = req.body;
         const userId = req.user?.id;
         if (!userId) {
             res.sendStatus(400);
             return;
         }
-        const announcement = await this.announcementService.createAnnouncement(input, userId);
+        const announcement = await this.managementService.createAnnouncement(input, userId);
         return res.json(announcement);
     }
     async deletePersistentAnnouncement(req, res) {
@@ -44,13 +48,14 @@ let AnnouncementController = class AnnouncementController {
             return;
         }
         try {
-            await this.announcementService.deletePersistentAnnouncement(announcementId);
+            await this.managementService.deletePersistentAnnouncement(announcementId);
             return res.sendStatus(200);
         }
-        catch (error) { }
+        catch (error) {
+            return res.status(500).json({ message: 'Failed to delete announcement' });
+        }
     }
     async updateAnnouncementRecipients(req, res) {
-        //! should update userId so that it gets retrieved via jwt cookie
         const { userIds } = req.body;
         const { announcementId } = req.params;
         const userId = req.user?.id;
@@ -58,32 +63,31 @@ let AnnouncementController = class AnnouncementController {
             res.sendStatus(400);
             return;
         }
-        const announcement = await this.announcementService.updateAnnouncementRecipients(announcementId, userIds);
-        return res.json(announcement);
+        await this.managementService.updateAnnouncementRecipients(announcementId, userIds);
+        return res.sendStatus(200);
     }
-    async addAcknowledgeToAnnouncement(req, res) {
-        let { announcementId } = req.params;
+    async findAnnouncementSenders(req, res) {
         const userId = req.user?.id;
-        if (!announcementId || !userId) {
+        if (!userId) {
             res.sendStatus(400);
             return;
         }
-        const announcement = await this.announcementService.addAcknowledgeToAnnouncement(announcementId, userId);
-        return res.json(announcement);
+        const users = await this.managementService.findAnnouncementSenders(userId);
+        return res.json(users);
     }
-    async addReadToAnnouncement(req, res) {
-        let { announcementId } = req.params;
-        const userId = req.user?.id;
-        if (!announcementId || !userId) {
+    async getAnnouncementRecipients(req, res) {
+        const { announcementId } = req.params;
+        if (!announcementId) {
             res.sendStatus(400);
             return;
         }
-        const announcement = await this.announcementService.addReadToAnnouncement(announcementId, userId);
-        return res.json(announcement);
+        const users = await this.managementService.findAnnouncementRecipients(announcementId);
+        return res.json(users);
     }
+    // ─── Inbox ────────────────────────────────────────────────────────────────────
     async getAnnouncements(_req, res) {
-        const announcement = await this.announcementService.getAnnouncements();
-        return res.json(announcement);
+        const announcements = await this.inboxService.getAnnouncements();
+        return res.json(announcements);
     }
     async getInbox(req, res, next) {
         const validationResult = FilterInboxAnnouncementSchema_1.FilterInboxAnnouncementSchema.parse(req.query);
@@ -93,7 +97,7 @@ let AnnouncementController = class AnnouncementController {
                 res.sendStatus(400);
                 return;
             }
-            const result = await this.announcementService.getInbox(userId, validationResult);
+            const result = await this.inboxService.getInbox(userId, validationResult);
             return res.json({
                 data: result,
                 pagination: {
@@ -105,9 +109,8 @@ let AnnouncementController = class AnnouncementController {
             });
         }
         catch (error) {
-            if (error instanceof zod_1.ZodError) {
+            if (error instanceof zod_1.ZodError)
                 return res.status(400).json(error);
-            }
             next(error);
         }
     }
@@ -119,7 +122,7 @@ let AnnouncementController = class AnnouncementController {
                 res.sendStatus(400);
                 return;
             }
-            const result = await this.announcementService.getSent(userId, validationResult);
+            const result = await this.inboxService.getSent(userId, validationResult);
             return res.json({
                 data: result,
                 pagination: {
@@ -131,9 +134,8 @@ let AnnouncementController = class AnnouncementController {
             });
         }
         catch (error) {
-            if (error instanceof zod_1.ZodError) {
+            if (error instanceof zod_1.ZodError)
                 return res.status(400).json(error);
-            }
             next(error);
         }
     }
@@ -143,37 +145,58 @@ let AnnouncementController = class AnnouncementController {
             res.sendStatus(400);
             return;
         }
-        const announcement = await this.announcementService.getAnnouncementById(announcementId);
+        const announcement = await this.inboxService.getAnnouncementById(announcementId);
         return res.json(announcement);
     }
-    async findAnnouncementSenders(req, res) {
+    async getAnnouncementCleanContent(req, res) {
+        const { announcementId } = req.params;
+        const userId = req.user?.id;
+        if (!userId || !announcementId) {
+            res.sendStatus(400);
+            return;
+        }
+        const cleanContent = await this.inboxService.getAnnouncementCleanContent(announcementId);
+        return res.json(cleanContent);
+    }
+    async findBannerAnnouncements(req, res) {
         const userId = req.user?.id;
         if (!userId) {
             res.sendStatus(400);
             return;
         }
-        const users = await this.announcementService.findAnnouncementSenders(userId);
-        return res.json(users);
+        const announcements = await this.inboxService.findBannerAnnouncements(userId);
+        return res.json(announcements);
     }
-    async getAnnouncementRecipients(req, res) {
-        const userId = req.user?.id;
+    // ─── Engagement ───────────────────────────────────────────────────────────────
+    async addAcknowledgeToAnnouncement(req, res) {
         const { announcementId } = req.params;
-        if (!userId || !announcementId) {
+        const userId = req.user?.id;
+        if (!announcementId || !userId) {
             res.sendStatus(400);
             return;
         }
-        const users = await this.announcementService.findAnnouncementRecipients(announcementId);
-        return res.json(users);
+        await this.engagementService.addAcknowledgeToAnnouncement(announcementId, userId);
+        return res.sendStatus(200);
+    }
+    async addReadToAnnouncement(req, res) {
+        const { announcementId } = req.params;
+        const userId = req.user?.id;
+        if (!announcementId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        await this.engagementService.addReadToAnnouncement(announcementId, userId);
+        return res.sendStatus(200);
     }
     async getAnnouncementReport(req, res) {
         const validationResult = FilterAnnouncementReportSchema_1.FilterAnnouncementReportSchema.parse(req.query);
-        const userId = req.user?.id;
         const { announcementId } = req.params;
+        const userId = req.user?.id;
         if (!userId || !announcementId) {
             res.sendStatus(400);
             return;
         }
-        const users = await this.announcementService.getAnnouncementReport(announcementId, validationResult, true);
+        const users = await this.engagementService.getAnnouncementReport(announcementId, validationResult, true);
         return res.json({
             data: users.announcementReportUsers,
             pagination: {
@@ -186,14 +209,14 @@ let AnnouncementController = class AnnouncementController {
     }
     async exportAnnouncementReportWithFilter(req, res, next) {
         const validationResult = FilterAnnouncementReportSchema_1.FilterAnnouncementReportSchema.parse(req.query);
-        const userId = req.user?.id;
         const { announcementId } = req.params;
+        const userId = req.user?.id;
         try {
             if (!userId || !announcementId) {
                 res.sendStatus(400);
                 return;
             }
-            const users = await this.announcementService.getAnnouncementReport(announcementId, validationResult, false);
+            const users = await this.engagementService.getAnnouncementReport(announcementId, validationResult, false);
             const headerMapping = {
                 user_id: 'User ID',
                 full_name: 'Full Name',
@@ -226,45 +249,24 @@ let AnnouncementController = class AnnouncementController {
                 });
             }
             const csvString = (0, convertToCsv_1.convertToCsv)(data, headerMapping);
-            const formattedDate = (0, getFormattedDate_1.getFilenameTimestamp)();
-            const fileName = `announcement-report-${formattedDate}.csv`;
+            const fileName = `announcement-report-${(0, getFormattedDate_1.getFilenameTimestamp)()}.csv`;
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
             res.status(200).send(csvString);
         }
         catch (error) {
-            if (error instanceof zod_1.ZodError) {
+            if (error instanceof zod_1.ZodError)
                 return res.status(400).json(error);
-            }
             next(error);
         }
-    }
-    async getAnnouncementCleanContent(req, res) {
-        const userId = req.user?.id;
-        const { announcementId } = req.params;
-        if (!userId || !announcementId) {
-            res.sendStatus(400);
-            return;
-        }
-        const cleanContent = await this.announcementService.getAnnouncementCleanContent(announcementId);
-        return res.json(cleanContent);
-    }
-    async findBannerAnnouncements(req, res) {
-        const userId = req.user?.id;
-        if (!userId) {
-            res.sendStatus(400);
-            return;
-        }
-        console.log('USER ID IS');
-        console.log(userId);
-        const announcements = await this.announcementService.findBannerAnnouncements(userId);
-        return res.json(announcements);
     }
 };
 exports.AnnouncementController = AnnouncementController;
 exports.AnnouncementController = AnnouncementController = __decorate([
     (0, inversify_1.injectable)(),
-    __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IAnnouncementService)),
-    __metadata("design:paramtypes", [Object])
+    __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IAnnouncementInboxService)),
+    __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IAnnouncementManagementService)),
+    __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IAnnouncementEngagementService)),
+    __metadata("design:paramtypes", [Object, Object, Object])
 ], AnnouncementController);
 //# sourceMappingURL=announcements.controller.js.map

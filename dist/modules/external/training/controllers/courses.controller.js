@@ -117,7 +117,6 @@ let CourseController = class CourseController {
     }
     async getCreatedCourses(req, res, next) {
         const userId = req.user?.id;
-        console.log('HEREEEE');
         if (!userId) {
             res.sendStatus(400);
             return;
@@ -142,7 +141,6 @@ let CourseController = class CourseController {
             res.sendStatus(400);
             return;
         }
-        console.log('HERE 1');
         const course = await this.courseService.getCourseById(courseId);
         res.json(course);
     }
@@ -163,7 +161,6 @@ let CourseController = class CourseController {
                 res.sendStatus(400);
                 return;
             }
-            console.log('HERE 2');
             const coursesWithProgress = await this.courseService.getCoursesWithProgress(userId);
             res.status(200).json(coursesWithProgress);
         }

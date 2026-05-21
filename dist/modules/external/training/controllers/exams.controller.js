@@ -18,23 +18,26 @@ const zod_1 = require("zod");
 const AppError_1 = require("../../../../shared/errors/AppError");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 let ExamController = class ExamController {
-    examService;
-    constructor(examService) {
-        this.examService = examService;
+    examAdminService;
+    examStudentService;
+    examStandaloneService;
+    constructor(examAdminService, examStudentService, examStandaloneService) {
+        this.examAdminService = examAdminService;
+        this.examStudentService = examStudentService;
+        this.examStandaloneService = examStandaloneService;
     }
+    // ─── Admin ────────────────────────────────────────────────────────────────────
     async createExam(req, res, next) {
         try {
             const input = req.body;
-            const exam = await this.examService.createExam(input);
+            const exam = await this.examAdminService.createExam(input);
             res.status(201).json(exam);
         }
         catch (error) {
-            if (error instanceof zod_1.ZodError) {
+            if (error instanceof zod_1.ZodError)
                 return res.status(400).json({ error });
-            }
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
             next(error);
         }
     }
@@ -43,19 +46,16 @@ let ExamController = class ExamController {
             const input = req.body;
             const { examId } = req.params;
             if (!examId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.updateExam(examId, input);
+            const exam = await this.examAdminService.updateExam(examId, input);
             res.status(200).json(exam);
         }
         catch (error) {
-            if (error instanceof zod_1.ZodError) {
+            if (error instanceof zod_1.ZodError)
                 return res.status(400).json({ error });
-            }
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
             next(error);
         }
     }
@@ -63,114 +63,139 @@ let ExamController = class ExamController {
         try {
             const { examId } = req.params;
             if (!examId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            await this.examService.deleteExam(examId);
-            res.status(200).json({ message: 'Option deleted successfully' });
+            await this.examAdminService.deleteExam(examId);
+            res.status(200).json({ message: 'Exam deleted successfully' });
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async getLatestExamVersion(req, res, next) {
         try {
             const { classId } = req.params;
             if (!classId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.getLatestExamVersion(classId);
+            const exam = await this.examAdminService.getLatestExamVersion(classId);
             res.status(200).json(exam);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async getAdminExam(req, res, next) {
         try {
             const { examId } = req.params;
             if (!examId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.getAdminExam(examId);
+            const exam = await this.examAdminService.getAdminExam(examId);
             res.status(200).json(exam);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async getAllClassExams(req, res, next) {
         try {
             const { classId } = req.params;
             if (!classId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.getAllClassExams(classId);
-            res.status(200).json(exam);
+            const exams = await this.examAdminService.getAllClassExams(classId);
+            res.status(200).json(exams);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async getAllClassExamsMetadataOnly(req, res, next) {
         try {
             const { classId } = req.params;
             if (!classId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exams = await this.examService.getAllClassExamsMetadataOnly(classId);
+            const exams = await this.examAdminService.getAllClassExamsMetadataOnly(classId);
             res.status(200).json(exams);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
+    async getExamsDashboard(req, res, next) {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                return res.sendStatus(400);
+            }
+            const dashboard = await this.examAdminService.getExamsDashboard();
+            res.status(200).json(dashboard);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError)
+                return res.status(400).json({ message: error.message });
+            next(error);
+        }
+    }
+    async getUserExamAttempts(req, res, next) {
+        try {
+            const { examId, userId } = req.params;
+            if (!userId || !examId) {
+                return res.sendStatus(400);
+            }
+            const attempts = await this.examAdminService.getUserExamAttempts(userId, examId);
+            res.status(200).json(attempts);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError)
+                return res.status(400).json({ message: error.message });
+            next(error);
+        }
+    }
+    // ─── Student ──────────────────────────────────────────────────────────────────
+    async getUserExam(req, res, next) {
+        try {
+            const userId = req.user?.id;
+            const { classId } = req.params;
+            if (!userId || !classId) {
+                return res.sendStatus(400);
+            }
+            const exam = await this.examStudentService.getUserExam(classId, userId);
+            res.status(200).json(exam);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError)
+                return res.status(400).json({ message: error.message });
+            next(error);
+        }
+    }
+    // ─── Standalone ───────────────────────────────────────────────────────────────
     async createStandaloneExam(req, res, next) {
         try {
             const userId = req.user?.id;
             if (!userId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.createStandaloneExam(userId);
+            const exam = await this.examStandaloneService.createStandaloneExam(userId);
             res.status(201).json(exam);
         }
         catch (error) {
-            if (error instanceof zod_1.ZodError) {
+            if (error instanceof zod_1.ZodError)
                 return res.status(400).json({ error });
-            }
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
             next(error);
         }
     }
@@ -178,38 +203,30 @@ let ExamController = class ExamController {
         try {
             const { standaloneExamId } = req.params;
             if (!standaloneExamId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.getStandaloneExam(standaloneExamId);
+            const exam = await this.examStandaloneService.getStandaloneExam(standaloneExamId);
             res.status(200).json(exam);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async getStandaloneExamMetadata(req, res, next) {
         try {
             const { standaloneExamId } = req.params;
             if (!standaloneExamId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.getStandaloneExamMetadata(standaloneExamId);
+            const exam = await this.examStandaloneService.getStandaloneExamMetadata(standaloneExamId);
             res.status(200).json(exam);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async updateStandaloneExamName(req, res, next) {
@@ -217,160 +234,80 @@ let ExamController = class ExamController {
             const { standaloneExamId } = req.params;
             const { examTitle } = req.body;
             if (!standaloneExamId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.updateStandaloneExamName(standaloneExamId, examTitle);
-            res.status(200).json(exam);
+            await this.examStandaloneService.updateStandaloneExamName(standaloneExamId, examTitle);
+            res.status(200).json({ message: 'Exam name updated' });
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
-        }
-    }
-    async getUserExam(req, res, next) {
-        try {
-            const userId = req.user?.id;
-            const { classId } = req.params;
-            if (!userId) {
-                res.status(400);
-                return;
-            }
-            if (!classId) {
-                res.status(400);
-                return;
-            }
-            const exam = await this.examService.getUserExam(classId, userId);
-            res.status(200).json(exam);
-        }
-        catch (error) {
-            if (error instanceof AppError_1.AppError) {
-                return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
-        }
-    }
-    async getExamsDashboard(req, res, next) {
-        try {
-            const userId = req.user?.id;
-            if (!userId) {
-                res.status(400);
-                return;
-            }
-            const exam = await this.examService.getExamsDashboard();
-            res.status(200).json(exam);
-        }
-        catch (error) {
-            if (error instanceof AppError_1.AppError) {
-                return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
-        }
-    }
-    async getUserExamAttempts(req, res, next) {
-        try {
-            const { examId } = req.params;
-            const { userId } = req.params;
-            if (!userId || !examId) {
-                res.status(400);
-                return;
-            }
-            const exam = await this.examService.getUserExamAttempts(userId, examId);
-            res.status(200).json(exam);
-        }
-        catch (error) {
-            if (error instanceof AppError_1.AppError) {
-                return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async getStandaloneExamsWaitingForApproval(_req, res, next) {
         try {
-            const exam = await this.examService.getStandaloneExamsWaitingForApproval();
-            res.status(200).json(exam);
+            const exams = await this.examStandaloneService.getStandaloneExamsWaitingForApproval();
+            res.status(200).json(exams);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async requestStandaloneExamApproval(req, res, next) {
         try {
             const { standaloneExamId } = req.params;
             if (!standaloneExamId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.requestStandaloneExamApproval(standaloneExamId);
+            const exam = await this.examStandaloneService.requestStandaloneExamApproval(standaloneExamId);
             res.status(200).json(exam);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async approveStandaloneExam(req, res, next) {
         try {
             const { standaloneExamId } = req.params;
             if (!standaloneExamId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.approveStandaloneExam(standaloneExamId);
+            const exam = await this.examStandaloneService.approveStandaloneExam(standaloneExamId);
             res.status(200).json(exam);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
     async getMyStandaloneExams(req, res, next) {
         try {
             const userId = req.user?.id;
             if (!userId) {
-                res.status(400);
-                return;
+                return res.sendStatus(400);
             }
-            const exam = await this.examService.getMyStandaloneExams(userId);
-            res.status(200).json(exam);
+            const exams = await this.examStandaloneService.getMyStandaloneExams(userId);
+            res.status(200).json(exams);
         }
         catch (error) {
-            if (error instanceof AppError_1.AppError) {
+            if (error instanceof AppError_1.AppError)
                 return res.status(400).json({ message: error.message });
-            }
-            else {
-                next(error);
-            }
+            next(error);
         }
     }
 };
 exports.ExamController = ExamController;
 exports.ExamController = ExamController = __decorate([
     (0, inversify_1.injectable)(),
-    __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamService)),
-    __metadata("design:paramtypes", [Object])
+    __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamAdminService)),
+    __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamStudentService)),
+    __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IExamStandaloneService)),
+    __metadata("design:paramtypes", [Object, Object, Object])
 ], ExamController);
 //# sourceMappingURL=exams.controller.js.map

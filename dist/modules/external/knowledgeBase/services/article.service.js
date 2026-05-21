@@ -44,533 +44,382 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArticleService = void 0;
 const inversify_1 = require("inversify");
-const data_source_1 = require("../../../../shared/database/data-source");
+const cheerio = __importStar(require("cheerio"));
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
-const ArticleVersion_entity_1 = require("../entities/ArticleVersion.entity");
-const Tag_entity_1 = require("../entities/Tag.entity");
 const ValidationError_1 = require("../../../../shared/errors/ValidationError");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 const BusinessLogicError_1 = require("../../../../shared/errors/BusinessLogicError");
-const ai_service_1 = require("../../../../shared/utils/ai.service");
-const pgvector_1 = __importDefault(require("pgvector"));
-const ArticleChunk_entity_1 = require("../entities/ArticleChunk.entity");
-const cheerio = __importStar(require("cheerio"));
 const MoveArticleSchema_1 = require("../schema/clients/MoveArticleSchema");
-const Article_entity_1 = require("../entities/Article.entity");
-const ES_1 = __importDefault(require("../../../../shared/types/enum/ES"));
 const CreateVersionSchema_1 = require("../schema/articles/CreateVersionSchema");
+const ai_service_1 = require("../../../../shared/utils/ai.service");
+const kb_constants_1 = require("../kb.constants");
+const articleChunking_service_1 = require("./articleChunking.service");
+const KB_PERM_VIEW_METADATA = 'kb:article:view:metadata';
 let ArticleService = class ArticleService {
     articleRepository;
     topicRepository;
     clientRepository;
     userRepository;
-    documentService;
     tagRepository;
-    constructor(articleRepository, topicRepository, clientRepository, userRepository, documentService, tagRepository) {
+    chunkingService;
+    constructor(articleRepository, topicRepository, clientRepository, userRepository, tagRepository, chunkingService) {
         this.articleRepository = articleRepository;
         this.topicRepository = topicRepository;
         this.clientRepository = clientRepository;
         this.userRepository = userRepository;
-        this.documentService = documentService;
         this.tagRepository = tagRepository;
+        this.chunkingService = chunkingService;
     }
-    async createArticle(articleName, articleContent, topicId, userId) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const user = await this.userRepository.findUserById(userId);
-            if (!user) {
-                throw new Error(`User with id ${userId} does not exist.`);
-            }
-            const exisitingTopic = await this.topicRepository.findById(topicId);
-            if (!exisitingTopic) {
-                throw new Error(`Topic with id ${topicId} does not exist.`);
-            }
-            const articleDocument = await this.documentService.createArticleDocument(articleContent);
-            const newArticle = new Article_entity_1.Article();
-            newArticle.topic = exisitingTopic;
-            newArticle.topic_id = topicId;
-            newArticle.user = user;
-            newArticle.user_id = userId;
-            const article = await data_source_1.AppDataSource.manager.save(newArticle);
-            const newArticleFirstVersion = new ArticleVersion_entity_1.ArticleVersion();
-            newArticleFirstVersion.article_name = articleName;
-            newArticleFirstVersion.document = articleDocument;
-            newArticleFirstVersion.user = user;
-            newArticleFirstVersion.user_id = userId;
-            newArticleFirstVersion.user_update = user;
-            newArticleFirstVersion.user_update_id = userId;
-            newArticleFirstVersion.version = 1;
-            newArticleFirstVersion.article = article;
-            return await this.articleRepository.create(newArticleFirstVersion);
-        });
+    // ─── Helpers ──────────────────────────────────────────────────────────────────
+    async getCanSeeDraft(userId) {
+        const user = await this.userRepository.findUserByIdWithPermissions(userId);
+        return (user?.role.permissions.findIndex((p) => p.permission_id === KB_PERM_VIEW_METADATA) !== -1);
+    }
+    // ─── Create ───────────────────────────────────────────────────────────────────
+    async createArticle(articleName, content, topicId, userId) {
+        const user = await this.userRepository.findUserById(userId);
+        if (!user)
+            throw new NotFoundError_1.NotFoundError('User', userId);
+        const topic = await this.topicRepository.findById(topicId);
+        if (!topic)
+            throw new NotFoundError_1.NotFoundError('Topic', topicId);
+        const updatedByName = `${user.first_name} ${user.last_name}`;
+        const created = await this.articleRepository.createArticle(topicId, userId, articleName, content, updatedByName);
+        if (content && content.trim()) {
+            await this.chunkingService.processVersionSafe(created.article_id, created.article_version_id, content);
+        }
+        return created;
     }
     async createVersion(input, userId) {
-        const validatedData = CreateVersionSchema_1.CreateVersionSchema.parse(input);
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const user = await this.userRepository.findUserById(userId);
-            if (!user) {
-                throw new NotFoundError_1.NotFoundError(`User`, userId);
-            }
-            const version = await this.articleRepository.findById(input.versionId);
-            if (!version) {
-                throw new NotFoundError_1.NotFoundError('Version', input.versionId);
-            }
-            const latestVersion = await this.articleRepository.findLatestVersion(version.article_id);
-            if (!latestVersion) {
-                throw new BusinessLogicError_1.BusinessLogicError('No latest version found');
-            }
-            if (validatedData.useVersionAsTemplate) {
-                const document = await this.documentService.getDocumentFromS3(version.document.document_id, 'articles');
-                const newVersion = new ArticleVersion_entity_1.ArticleVersion();
-                newVersion.article_name = version.article_name;
-                newVersion.article_synopsis = version.article_synopsis;
-                newVersion.article_status = ES_1.default.DRAFT;
-                newVersion.article = version.article;
-                newVersion.article_id = version.article_id;
-                const versionDocument = await this.documentService.createArticleDocument(document);
-                newVersion.document = versionDocument;
-                newVersion.user = version.user;
-                newVersion.user_id = version.user_id;
-                newVersion.user_update = user;
-                newVersion.user_update_id = user.user_id;
-                newVersion.version = latestVersion.version + 1;
-                newVersion.tags = version.tags;
-                return await this.articleRepository.create(newVersion);
-            }
-            else {
-                const versionDocument = await this.documentService.createArticleDocument('');
-                const newVersion = new ArticleVersion_entity_1.ArticleVersion();
-                newVersion.article_name = '';
-                newVersion.article_synopsis = '';
-                newVersion.article_status = ES_1.default.DRAFT;
-                newVersion.article = version.article;
-                newVersion.article_id = version.article_id;
-                newVersion.document = versionDocument;
-                newVersion.user = version.user;
-                newVersion.user_id = version.user_id;
-                newVersion.version = latestVersion.version + 1;
-                return await this.articleRepository.create(newVersion);
-            }
-        });
-    }
-    async addTagToArticle(articleId, tagName) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const article = await this.articleRepository.findById(articleId);
-            if (!article) {
-                throw new Error(`Article with id ${articleId} does not exist.`);
-            }
-            let tag = await this.tagRepository.findByName(tagName);
-            if (!tag) {
-                const newTag = new Tag_entity_1.Tag();
-                newTag.tag_name = tagName;
-                tag = await this.tagRepository.create(newTag);
-            }
-            article.tags = [...(article.tags || []), tag];
-            await this.articleRepository.save(article);
-            return tag;
-        });
-    }
-    async removeTagFromArticle(articleId, tagId) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const article = await this.articleRepository.findById(articleId);
-            if (!article) {
-                throw new Error(`Article with id ${articleId} does not exist.`);
-            }
-            if (!article.tags) {
-                return;
-            }
-            article.tags = article.tags.filter((tag) => tag.tag_id !== tagId);
-            await this.articleRepository.save(article);
-        });
-    }
-    async getArticles(topicId) {
-        return await this.articleRepository.findAllByTopicId(topicId);
-    }
-    async findArticles(filters, userId) {
-        let embeddingSql = null;
-        if (filters.search) {
-            const queryEmbedding = await (0, ai_service_1.getEmbedding)(filters.search);
-            embeddingSql = pgvector_1.default.toSql(queryEmbedding);
-        }
-        const user = await this.userRepository.findUserByIdWithPermissions(userId);
-        const canSeeDraft = user?.role.permissions.findIndex((p) => p.permission_id === 'kb:article:view:metadata') !== -1;
-        return await this.articleRepository.findAndCountArticles(filters, embeddingSql, canSeeDraft);
-    }
-    async findLatestArticlesByUserId(userId) {
+        const data = CreateVersionSchema_1.CreateVersionSchema.parse(input);
         const user = await this.userRepository.findUserById(userId);
-        if (!user?.clients || user.clients.length === 0) {
-            return [];
-        }
-        const clientIds = user.clients.map((c) => c.client_id);
-        console.log('CLIENT IDS: ');
-        console.log(clientIds);
-        if (clientIds.length === 0) {
-            return [];
-        }
-        return await this.articleRepository.findAllLatestByUserId(clientIds);
-    }
-    async findArticlesByClientId(clientId, filters, userId) {
-        let embeddingSql = null;
-        if (filters.search) {
-            const queryEmbedding = await (0, ai_service_1.getEmbedding)(filters.search);
-            embeddingSql = pgvector_1.default.toSql(queryEmbedding);
-        }
-        const user = await this.userRepository.findUserByIdWithPermissions(userId);
-        const canSeeDraft = user?.role.permissions.findIndex((p) => p.permission_id === 'kb:article:view:metadata') !== -1;
-        const res = await this.articleRepository.findAndCountArticlesByClientId(clientId, filters, embeddingSql, canSeeDraft);
-        console.log('RES: ');
-        console.log(res);
-        return res;
-    }
-    async findArticlesByTopicId(topicId, filters, userId) {
-        let embeddingSql = null;
-        if (filters.search) {
-            const queryEmbedding = await (0, ai_service_1.getEmbedding)(filters.search);
-            embeddingSql = pgvector_1.default.toSql(queryEmbedding);
-        }
-        const user = await this.userRepository.findUserByIdWithPermissions(userId);
-        const canSeeDraft = user?.role.permissions.findIndex((p) => p.permission_id === 'kb:article:view:metadata') !== -1;
-        return await this.articleRepository.findAndCountArticlesByTopicId(topicId, filters, embeddingSql, canSeeDraft);
-    }
-    async getArticleById(articleId) {
-        const article = await this.articleRepository.findById(articleId);
-        if (!article) {
-            throw new NotFoundError_1.NotFoundError('Article', articleId);
-        }
-        // const document = await this.documentService.getLocalDocument(
-        //   article.document.document_id,
-        //   'articles',
-        // );
-        const document = await this.documentService.getDocumentFromS3(article.document.document_id, 'articles');
-        return {
-            article,
-            document,
-            available_for_client: article.article.available_for_client,
-        };
-    }
-    async getArticleDocumentById(articleId) {
-        const article = await this.articleRepository.findById(articleId);
-        if (!article) {
-            throw new NotFoundError_1.NotFoundError('Article', articleId);
-        }
-        // return await this.documentService.getLocalDocument(
-        //   article.document.document_id,
-        //   'articles',
-        // );
-        return await this.documentService.getDocumentFromS3(article.document.document_id, 'articles');
-    }
-    async updateArticleContent(articleId, articleContent, userId) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const article = await this.articleRepository.findById(articleId);
-            if (!article) {
-                throw new NotFoundError_1.NotFoundError('Article', articleId);
-            }
-            const user = await this.userRepository.findUserById(userId);
-            if (!user) {
-                throw new NotFoundError_1.NotFoundError('User', userId);
-            }
-            // await this.documentService.updateLocalDocument(
-            //   article.document.document_id,
-            //   'articles',
-            //   articleContent,
-            // );
-            await this.documentService.uploadDocumentToS3(article.document.document_id, 'articles', articleContent);
-            article.user_update = user;
-            article.user_update_id = userId;
-            await this.articleRepository.save(article);
-            await this.updateArticleChunks(article, articleContent);
+        if (!user)
+            throw new NotFoundError_1.NotFoundError('User', userId);
+        const existing = await this.articleRepository.findByVersionId(data.versionId);
+        if (!existing)
+            throw new NotFoundError_1.NotFoundError('Version', data.versionId);
+        const newVersion = await this.articleRepository.addVersion(data.versionId, {
+            useVersionAsTemplate: data.useVersionAsTemplate,
+            userId,
+            updatedByName: `${user.first_name} ${user.last_name}`,
         });
+        if (data.useVersionAsTemplate && newVersion.content && newVersion.content.trim()) {
+            await this.chunkingService.processVersionSafe(newVersion.article_id, newVersion.article_version_id, newVersion.content);
+        }
+        return newVersion;
     }
-    async updateArticleChunks(article, htmlContent) {
-        const chunkRepository = data_source_1.AppDataSource.getRepository(ArticleChunk_entity_1.ArticleChunk);
-        await chunkRepository.delete({
-            articleVersion: { article_version_id: article.article_id },
-        });
-        const $ = cheerio.load(htmlContent);
+    // ─── Content updates ──────────────────────────────────────────────────────────
+    async updateArticleContent(versionId, content, userId) {
+        const [existing, user] = await Promise.all([
+            this.articleRepository.findByVersionId(versionId),
+            this.userRepository.findUserById(userId),
+        ]);
+        if (!existing)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        const updatedByName = user ? `${user.first_name} ${user.last_name}` : null;
+        await this.articleRepository.updateVersionContent(versionId, content, userId, updatedByName);
+        await this.chunkingService.processVersionSafe(existing.article_id, versionId, content);
+    }
+    async updateArticleName(versionId, articleName) {
+        if (articleName.length < 2) {
+            throw new ValidationError_1.ValidationError('Article name must be at least 2 characters.');
+        }
+        const existing = await this.articleRepository.findByVersionId(versionId);
+        if (!existing)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        await this.articleRepository.updateVersionName(versionId, articleName);
+    }
+    async updateArticleSynopsis(versionId, synopsis) {
+        if (synopsis.length < 2) {
+            throw new ValidationError_1.ValidationError('Synopsis must be at least 2 characters.');
+        }
+        const existing = await this.articleRepository.findByVersionId(versionId);
+        if (!existing)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        await this.articleRepository.updateVersionSynopsis(versionId, synopsis);
+    }
+    async generateAISynopsis(versionId) {
+        const article = await this.articleRepository.findByVersionId(versionId);
+        if (!article)
+            throw new NotFoundError_1.NotFoundError('Article Version', versionId);
+        const $ = cheerio.load(article.content);
         $('br').replaceWith(' ');
         $('p, li, h1, h2, h3, div, th, td, blockquote').after('\n\n');
-        const fullText = $('body').text();
-        const chunks = fullText
-            .split('\n\n')
-            .map((chunk) => chunk.replace(/\s+/g, ' ').trim());
-        for (const chunkText of chunks) {
-            if (chunkText.length <= 1) {
-                continue;
-            }
-            const embeddingVector = await (0, ai_service_1.getEmbedding)(chunkText);
-            const newChunk = chunkRepository.create({
-                article_version_id: article.article_id,
-                articleVersion: article,
-                content: chunkText,
-                embedding: pgvector_1.default.toSql(embeddingVector),
-            });
-            await chunkRepository.save(newChunk);
+        const plainText = $('body').text().trim();
+        const synopsis = await (0, ai_service_1.generateArticleSynopsis)(plainText);
+        await this.articleRepository.updateVersionSynopsis(versionId, synopsis);
+        return synopsis;
+    }
+    // ─── Edit lock ────────────────────────────────────────────────────────────────
+    async startArticleEdit(userId, versionId) {
+        const lockInfo = await this.articleRepository.getLockInfo(versionId);
+        if (!lockInfo)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        const now = new Date();
+        if (lockInfo.locked_by_user_id && lockInfo.lock_expires_at && lockInfo.lock_expires_at > now) {
+            throw new BusinessLogicError_1.BusinessLogicError('Article is currently being edited by another user.');
         }
+        const expiresAt = new Date(now.getTime() + kb_constants_1.ARTICLE_LOCK_DURATION_MS);
+        await this.articleRepository.acquireLock(versionId, userId, expiresAt);
     }
-    async updateArticleName(articleId, articleName) {
-        if (articleName.length <= 1) {
-            throw new ValidationError_1.ValidationError('Article name needs to be at least 2 characters');
+    async refreshEditLock(userId, versionId) {
+        const lockInfo = await this.articleRepository.getLockInfo(versionId);
+        if (!lockInfo)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        if (lockInfo.locked_by_user_id && lockInfo.locked_by_user_id !== userId) {
+            throw new BusinessLogicError_1.BusinessLogicError('You do not own this lock.');
         }
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const article = await this.articleRepository.findById(articleId);
-            if (!article) {
-                throw new NotFoundError_1.NotFoundError('Article', articleId);
-            }
-            article.article_name = articleName;
-            await this.articleRepository.save(article);
-        });
+        const expiresAt = new Date(Date.now() + kb_constants_1.ARTICLE_LOCK_DURATION_MS);
+        await this.articleRepository.refreshLock(versionId, expiresAt);
     }
-    async updateArticleSynopsis(articleId, articleSynopsis) {
-        if (articleSynopsis.length <= 1) {
-            throw new ValidationError_1.ValidationError('Synopsis too short');
+    async closeArticleEdit(userId, versionId) {
+        const lockInfo = await this.articleRepository.getLockInfo(versionId);
+        if (!lockInfo)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        if (lockInfo.locked_by_user_id && lockInfo.locked_by_user_id !== userId) {
+            throw new BusinessLogicError_1.BusinessLogicError('You do not own this lock.');
         }
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const article = await this.articleRepository.findById(articleId);
-            if (!article) {
-                throw new NotFoundError_1.NotFoundError('Article', articleId);
-            }
-            article.article_synopsis = articleSynopsis;
-            await this.articleRepository.save(article);
-        });
-    }
-    async generateAISynopsis(articleVersionId) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const articleVersion = await this.articleRepository.findById(articleVersionId);
-            if (!articleVersion) {
-                console.log('Article Version not found', articleVersionId);
-                throw new NotFoundError_1.NotFoundError('Article Version', articleVersionId);
-            }
-            const document = await this.documentService.getDocumentFromS3(articleVersion.document_id, 'articles');
-            const $ = cheerio.load(document);
-            $('br').replaceWith(' ');
-            $('p, li, h1, h2, h3, div, th, td, blockquote').after('\n\n');
-            const fullText = $('body').text();
-            const articleContent = fullText;
-            const articleSynopsis = await (0, ai_service_1.generateArticleSynopsis)(articleContent);
-            articleVersion.article_synopsis = articleSynopsis;
-            await this.articleRepository.save(articleVersion);
-            return articleSynopsis;
-        });
-    }
-    async startArticleEdit(userId, articleId) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const article = await this.articleRepository.findById(articleId);
-            if (!article) {
-                throw new NotFoundError_1.NotFoundError('Article', articleId);
-            }
-            const now = new Date();
-            const parentArticle = article.article;
-            if (!parentArticle) {
-                throw new NotFoundError_1.NotFoundError('Article', articleId);
-            }
-            if (!parentArticle.lock_expires_at ||
-                parentArticle.lock_expires_at < now) {
-                parentArticle.locked_by_user_id = userId;
-                parentArticle.lock_expires_at = new Date(now.getTime() + 60 * 1000);
-                await this.articleRepository.saveArticle(parentArticle);
-                return;
-            }
-            else {
-                throw new BusinessLogicError_1.BusinessLogicError('Article is currently being edited by another user.');
-            }
-        });
-    }
-    async refreshEditLock(_userId, articleId) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const article = await this.articleRepository.findByIdAndLockedById(articleId);
-            if (!article) {
-                throw new NotFoundError_1.NotFoundError('Article', articleId);
-            }
-            const parentArticle = article.article;
-            if (!parentArticle) {
-                throw new NotFoundError_1.NotFoundError('Article', articleId);
-            }
-            parentArticle.lock_expires_at = new Date(new Date().getTime() + 60 * 1000);
-            await this.articleRepository.saveArticle(parentArticle);
-        });
-    }
-    async closeArticleEdit(_userId, articleId) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const article = await this.articleRepository.findByIdAndLockedById(articleId);
-            if (!article) {
-                throw new BusinessLogicError_1.BusinessLogicError('Article is not locked by this user');
-            }
-            const parentArticle = article.article;
-            if (!parentArticle) {
-                throw new NotFoundError_1.NotFoundError('Article', articleId);
-            }
-            parentArticle.locked_by_user_id = null;
-            parentArticle.lock_expires_at = null;
-            await this.articleRepository.saveArticle(parentArticle);
-        });
+        await this.articleRepository.releaseLock(versionId);
     }
     async releaseAllArticleLocks() {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const articles = await this.articleRepository.findAllArticleLocked();
-            if (!articles || articles.length === 0) {
-                return;
-            }
-            const articlesToSave = [];
-            for (const article of articles) {
-                article.locked_by_user_id = null;
-                article.lock_expires_at = null;
-                articlesToSave.push(article);
-            }
-            await this.articleRepository.saveManyArticle(articlesToSave);
-        });
+        await this.articleRepository.releaseAllLocks();
     }
-    async getArticleLockInfo(articleId) {
-        const article = await this.articleRepository.findByIdAndLockedById(articleId);
-        if (!article) {
-            throw new NotFoundError_1.NotFoundError('Article', articleId);
+    async getArticleLockInfo(versionId) {
+        const lockInfo = await this.articleRepository.getLockInfo(versionId);
+        if (!lockInfo)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        return lockInfo;
+    }
+    // ─── Tags ─────────────────────────────────────────────────────────────────────
+    async addTagToArticle(versionId, tagName) {
+        const existing = await this.articleRepository.findByVersionId(versionId);
+        if (!existing)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        let tag = await this.tagRepository.findByName(tagName);
+        if (!tag) {
+            tag = await this.tagRepository.create({ tag_name: tagName });
         }
-        const parentArticle = article.article;
-        if (!parentArticle) {
-            throw new NotFoundError_1.NotFoundError('Article', articleId);
-        }
-        const isAvailable = parentArticle.locked_by_user_id === null;
-        return isAvailable;
+        await this.articleRepository.addTagToVersion(versionId, tag._id.toString());
+        return tag;
     }
-    async moveArticleToTopic(input, userId) {
-        const validatedData = MoveArticleSchema_1.MoveArticleSchema.parse(input);
-        await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            // TODO: CHECK USER PERMISSIONS
-            console.log(userId);
-            const articles = await this.articleRepository.findByIds(validatedData.articleIds);
-            if (articles.length === 0) {
-                throw new BusinessLogicError_1.BusinessLogicError('Articles to move cannot be empty');
-            }
-            const topic = await this.topicRepository.findById(input.topicId);
-            if (!topic) {
-                throw new NotFoundError_1.NotFoundError('Topic', input.topicId);
-            }
-            const articlesToSave = [];
-            for (const article of articles) {
-                article.article.topic = topic;
-                article.article.topic_id = topic.topic_id;
-                articlesToSave.push(article.article);
-            }
-            await this.articleRepository.saveManyArticle(articlesToSave);
-        });
+    async removeTagFromArticle(versionId, tagId) {
+        const existing = await this.articleRepository.findByVersionId(versionId);
+        if (!existing)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        await this.articleRepository.removeTagFromVersion(versionId, tagId);
     }
-    async getArticleVersionsByArticleVersionId(articleVersionId) {
-        const versions = await this.articleRepository.findVersionsByVersionId(articleVersionId);
-        if (versions.length === 0) {
-            throw new BusinessLogicError_1.BusinessLogicError('No versions found');
-        }
-        return versions;
+    // ─── Queries ──────────────────────────────────────────────────────────────────
+    async getArticles(topicId) {
+        return this.articleRepository.findAllLatestByTopicId(topicId);
     }
-    async publishVersions(articleIds) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const versions = await this.articleRepository.findByIds(articleIds);
-            if (versions.length === 0) {
-                throw new BusinessLogicError_1.BusinessLogicError('No versions found');
-            }
-            for (const version of versions) {
-                if (version.article_status !== ES_1.default.UNPUBLISHED) {
-                    throw new BusinessLogicError_1.BusinessLogicError('Article is not in draft status');
-                }
-                version.article_status = ES_1.default.PUBLISHED;
-                version.published_at = new Date();
-                await this.articleRepository.save(version);
-            }
-        });
+    async findLatestArticlesByUserId(userId) {
+        const clients = await this.clientRepository.findAllWithUserId(userId);
+        if (clients.length === 0)
+            return [];
+        const clientIds = clients.map((c) => c.client_id);
+        const topics = await this.topicRepository.findAllByClientIds(clientIds);
+        if (topics.length === 0)
+            return [];
+        const topicIds = topics.map((t) => t.topic_id);
+        return this.articleRepository.findRecentByTopicIds(topicIds, 10);
     }
-    async unpublishVersions(articleIds) {
-        await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            console.log('articleIds');
-            console.log(articleIds);
-            const versions = await this.articleRepository.findByIds(articleIds);
-            console.log('versions');
-            console.log(versions);
-            if (versions.length === 0) {
-                console.log('No versions found');
-                throw new BusinessLogicError_1.BusinessLogicError('No versions found');
-            }
-            for (const version of versions) {
-                if (version.article_status !== ES_1.default.PUBLISHED) {
-                    console.log('Article is not published');
-                    throw new BusinessLogicError_1.BusinessLogicError('Article is not published');
-                }
-                version.article_status = ES_1.default.UNPUBLISHED;
-                await this.articleRepository.save(version);
-            }
-        });
+    async findArticles(filters, userId) {
+        const canSeeDraft = await this.getCanSeeDraft(userId);
+        return this.articleRepository.findAndCount(filters, canSeeDraft);
     }
-    async publishVersion(articleVersionId) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const version = await this.articleRepository.findById(articleVersionId);
-            if (!version) {
-                throw new NotFoundError_1.NotFoundError('Article version', articleVersionId);
-            }
-            if (version.article_status !== ES_1.default.DRAFT &&
-                version.article_status !== ES_1.default.UNPUBLISHED) {
-                throw new BusinessLogicError_1.BusinessLogicError('Article is not in draft or unpublished status');
-            }
-            version.article_status = ES_1.default.PUBLISHED;
-            if (version.article_status === ES_1.default.DRAFT) {
-                const previousVersion = await this.articleRepository.findVersionByArticleIdAndVersionNumber(version.article_id, version.version - 1);
-                if (previousVersion) {
-                    previousVersion.article_status = ES_1.default.OUTDATED;
-                    await this.articleRepository.save(previousVersion);
-                }
-            }
-            return this.articleRepository.save(version);
-        });
+    async findArticlesByClientId(clientId, filters, userId) {
+        const canSeeDraft = await this.getCanSeeDraft(userId);
+        const topics = await this.topicRepository.findAllByClientId(clientId);
+        if (topics.length === 0)
+            return { articles: [], total: 0 };
+        const topicIds = topics.map((t) => t.topic_id);
+        return this.articleRepository.findAndCountByTopicIds(topicIds, filters, canSeeDraft);
     }
-    async unpublishVersion(articleVersionId) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const version = await this.articleRepository.findById(articleVersionId);
-            if (!version) {
-                throw new NotFoundError_1.NotFoundError('Article version', articleVersionId);
-            }
-            if (version.article_status !== ES_1.default.PUBLISHED) {
-                throw new BusinessLogicError_1.BusinessLogicError('Article is not in published status');
-            }
-            version.article_status = ES_1.default.UNPUBLISHED;
-            return this.articleRepository.save(version);
-        });
+    async findArticlesByTopicId(topicId, filters, userId) {
+        const canSeeDraft = await this.getCanSeeDraft(userId);
+        return this.articleRepository.findAndCountByTopicId(topicId, filters, canSeeDraft);
     }
-    async findSharedArticlesByClientSharedId(filters, clientSharedId) {
-        const client = await this.clientRepository.findBySharedId(clientSharedId);
-        if (!client) {
-            throw new NotFoundError_1.NotFoundError('Client', clientSharedId);
-        }
-        let embeddingSql = null;
-        if (filters.search) {
-            const queryEmbedding = await (0, ai_service_1.getEmbedding)(filters.search);
-            embeddingSql = pgvector_1.default.toSql(queryEmbedding);
-        }
-        const rawArticles = await this.articleRepository.findSharedArticlesByClientSharedId(clientSharedId, embeddingSql);
-        const articles = rawArticles.map((article) => {
-            return {
-                article_id: article.article_id,
-                article_name: article.article_name,
-                article_synopsis: article.article_synopsis,
-                updated_at: article.updatedAt,
-            };
-        });
-        return articles;
+    async getArticleById(versionId) {
+        const article = await this.articleRepository.findByVersionId(versionId);
+        if (!article)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        return article;
     }
-    async getArticleByExternalClientAndArticleId(clientSharedId, articleId) {
-        const article = await this.articleRepository.getArticleByExternalClientAndArticleId(clientSharedId, articleId);
-        if (!article) {
-            throw new NotFoundError_1.NotFoundError('Article', articleId);
-        }
-        const document = await this.documentService.getDocumentFromS3(article.document.document_id, 'articles');
+    async getArticleWithDetails(versionId) {
+        const view = await this.articleRepository.findByVersionId(versionId);
+        if (!view)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        const [tags, topic, creator, updater, publisher] = await Promise.all([
+            this.tagRepository.findByIds(view.tag_ids),
+            this.topicRepository.findById(view.topic_id),
+            view.created_by ? this.userRepository.findUserById(view.created_by) : null,
+            view.updated_by ? this.userRepository.findUserById(view.updated_by) : null,
+            view.published_by ? this.userRepository.findUserById(view.published_by) : null,
+        ]);
         return {
             article: {
-                article_id: article.article_id,
-                article_name: article.article_name,
-                article_synopsis: article.article_synopsis,
-                updated_at: article.updatedAt,
+                article_version_id: view.article_version_id,
+                article_name: view.article_name,
+                article_synopsis: view.article_synopsis,
+                article_status: view.article_status,
+                version: view.version,
+                locked_by_user_id: view.locked_by_user_id,
+                lock_expires_at: view.lock_expires_at,
+                createdAt: view.createdAt,
+                updatedAt: view.updatedAt,
+                published_at: view.published_at,
+                tags: tags.map((t) => ({ tag_id: t._id.toString(), tag_name: t.tag_name })),
+                user: creator ? { first_name: creator.first_name, last_name: creator.last_name } : null,
+                user_update: updater ? { first_name: updater.first_name, last_name: updater.last_name } : null,
+                user_publish: publisher ? { first_name: publisher.first_name, last_name: publisher.last_name } : null,
+                article: {
+                    article_id: view.article_id,
+                    topic: topic
+                        ? { topic_id: topic.topic_id, topic_name: topic.topic_name, client_id: topic.client_id }
+                        : { topic_id: view.topic_id, topic_name: '', client_id: '' },
+                    user_id: view.user_id,
+                },
             },
-            document,
+            available_for_client: view.available_for_client,
+        };
+    }
+    async getArticleDocumentById(versionId) {
+        const article = await this.articleRepository.findByVersionId(versionId);
+        if (!article)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        return article.content;
+    }
+    // ─── Lifecycle ────────────────────────────────────────────────────────────────
+    async moveArticleToTopic(input, _userId) {
+        const data = MoveArticleSchema_1.MoveArticleSchema.parse(input);
+        const topic = await this.topicRepository.findById(data.topicId);
+        if (!topic)
+            throw new NotFoundError_1.NotFoundError('Topic', data.topicId);
+        await this.articleRepository.moveArticlesToTopic(data.articleIds, data.topicId);
+    }
+    async getArticleVersionsByArticleVersionId(versionId) {
+        const versions = await this.articleRepository.findVersionsByVersionId(versionId);
+        if (versions.length === 0)
+            throw new BusinessLogicError_1.BusinessLogicError('No versions found.');
+        return versions;
+    }
+    async publishVersion(versionId) {
+        const article = await this.articleRepository.findByVersionId(versionId);
+        if (!article)
+            throw new NotFoundError_1.NotFoundError('Article version', versionId);
+        if (article.article_status !== 'draft' && article.article_status !== 'unpublished') {
+            throw new BusinessLogicError_1.BusinessLogicError('Article must be in draft or unpublished status to publish.');
+        }
+        await this.articleRepository.updateVersionStatus(versionId, 'published');
+        const updated = await this.articleRepository.findByVersionId(versionId);
+        if (!updated)
+            throw new NotFoundError_1.NotFoundError('Article version', versionId);
+        return updated;
+    }
+    async unpublishVersion(versionId) {
+        const article = await this.articleRepository.findByVersionId(versionId);
+        if (!article)
+            throw new NotFoundError_1.NotFoundError('Article version', versionId);
+        if (article.article_status !== 'published') {
+            throw new BusinessLogicError_1.BusinessLogicError('Article is not in published status.');
+        }
+        await this.articleRepository.updateVersionStatus(versionId, 'unpublished');
+        const updated = await this.articleRepository.findByVersionId(versionId);
+        if (!updated)
+            throw new NotFoundError_1.NotFoundError('Article version', versionId);
+        return updated;
+    }
+    async publishVersions(versionIds) {
+        const versions = await this.articleRepository.findByVersionIds(versionIds);
+        if (versions.length === 0)
+            throw new BusinessLogicError_1.BusinessLogicError('No versions found.');
+        for (const v of versions) {
+            if (v.article_status !== 'unpublished') {
+                throw new BusinessLogicError_1.BusinessLogicError(`Version ${v.article_version_id} is not in unpublished status.`);
+            }
+        }
+        await this.articleRepository.updateVersionsStatus(versionIds, 'published');
+    }
+    async unpublishVersions(versionIds) {
+        const versions = await this.articleRepository.findByVersionIds(versionIds);
+        if (versions.length === 0)
+            throw new BusinessLogicError_1.BusinessLogicError('No versions found.');
+        for (const v of versions) {
+            if (v.article_status !== 'published') {
+                throw new BusinessLogicError_1.BusinessLogicError(`Version ${v.article_version_id} is not in published status.`);
+            }
+        }
+        await this.articleRepository.updateVersionsStatus(versionIds, 'unpublished');
+    }
+    // ─── External client portal ───────────────────────────────────────────────────
+    /** Resolves clientSharedId → client → topics, then delegates to the repo. */
+    async resolveTopicIdsForSharedClient(clientSharedId) {
+        const client = await this.clientRepository.findBySharedId(clientSharedId);
+        if (!client)
+            return [];
+        const topics = await this.topicRepository.findAllByClientId(client.client_id);
+        return topics.map((t) => t.topic_id);
+    }
+    async findSharedArticlesByClientSharedId(filters, clientSharedId) {
+        const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+        if (topicIds.length === 0)
+            return [];
+        const views = await this.articleRepository.findPublishedByTopicIds(topicIds, filters);
+        return views.map((v) => ({
+            article_id: v.article_version_id,
+            article_name: v.article_name,
+            article_synopsis: v.article_synopsis,
+            updated_at: v.updatedAt,
+        }));
+    }
+    async getArticleByExternalClientAndArticleId(clientSharedId, versionId) {
+        const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+        if (topicIds.length === 0)
+            throw new NotFoundError_1.NotFoundError('Client', clientSharedId);
+        const view = await this.articleRepository.findPublishedVersionByTopicIds(topicIds, versionId);
+        if (!view)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        return {
+            article: {
+                article_id: view.article_version_id,
+                article_name: view.article_name,
+                article_synopsis: view.article_synopsis,
+                updated_at: view.updatedAt,
+            },
+            content: view.content,
+        };
+    }
+    // ─── Admin variants (ignore `available_for_client` flag) ─────────────────────
+    async findAllPublishedByClientSharedId(filters, clientSharedId) {
+        const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+        if (topicIds.length === 0)
+            return [];
+        const views = await this.articleRepository.findPublishedByTopicIds(topicIds, filters, true);
+        return views.map((v) => ({
+            article_id: v.article_version_id,
+            article_name: v.article_name,
+            article_synopsis: v.article_synopsis,
+            updated_at: v.updatedAt,
+        }));
+    }
+    async getArticleByExternalClientAndArticleIdAdmin(clientSharedId, versionId) {
+        const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+        if (topicIds.length === 0)
+            throw new NotFoundError_1.NotFoundError('Client', clientSharedId);
+        const view = await this.articleRepository.findPublishedVersionByTopicIds(topicIds, versionId, true);
+        if (!view)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        return {
+            article: {
+                article_id: view.article_version_id,
+                article_name: view.article_name,
+                article_synopsis: view.article_synopsis,
+                updated_at: view.updatedAt,
+            },
+            content: view.content,
         };
     }
 };
@@ -581,8 +430,8 @@ exports.ArticleService = ArticleService = __decorate([
     __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.ITopicRepository)),
     __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IClientRepository)),
     __param(3, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserRepository)),
-    __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.IDocumentService)),
-    __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.ITagRepository)),
-    __metadata("design:paramtypes", [Object, Object, Object, Object, Object, Object])
+    __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.ITagRepository)),
+    __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleChunkingService)),
+    __metadata("design:paramtypes", [Object, Object, Object, Object, Object, articleChunking_service_1.ArticleChunkingService])
 ], ArticleService);
 //# sourceMappingURL=article.service.js.map

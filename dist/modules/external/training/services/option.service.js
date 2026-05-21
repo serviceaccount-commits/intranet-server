@@ -80,7 +80,6 @@ let OptionService = class OptionService {
                 // This logic ensures only one option is marked as correct.
                 for (const opt of allOptions) {
                     // Set the clicked option to true, all others to false.
-                    console.log(opt.option_id);
                     opt.is_correct = opt.option_id === optionId;
                 }
                 // Save all changes in one go. This is more efficient.
@@ -146,7 +145,6 @@ let OptionService = class OptionService {
         return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
             const options = await this.optionRepository.findAllByQuestionId(questionId, false);
             let optionsToSave = [];
-            console.log('OPTIONSSS: ', options);
             for (const option of options) {
                 if (option.question_id === questionId) {
                     option.status = ES_1.default.ACTIVE;

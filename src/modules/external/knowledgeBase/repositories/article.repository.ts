@@ -584,18 +584,25 @@ export class ArticleRepository implements IArticleRepository {
 
   // ─── External client portal ───────────────────────────────────────────────────
 
-  /** Returns published articles visible to external clients for the given topic IDs.
+  /** Returns published articles for the given topic IDs.
+   *  By default restricts to articles marked `available_for_client: true`.
+   *  When `includeUnavailable` is true, returns ALL published articles regardless of that flag
+   *  (used by the admin endpoint).
    *  Client/topic resolution is the caller's responsibility (ArticleService). */
   async findPublishedByTopicIds(
     topicIds: string[],
     filters: FilterArticleInput,
+    includeUnavailable = false,
   ): Promise<KbArticleVersionView[]> {
     if (topicIds.length === 0) return [];
 
     const { search } = filters;
+    const articleMatch: Record<string, unknown> = { topic_id: { $in: topicIds } };
+    if (!includeUnavailable) articleMatch['available_for_client'] = true;
+
     const matchStages: Record<string, unknown>[] = [
       ...(search ? [{ $match: { $text: { $search: search } } }] : []),
-      { $match: { topic_id: { $in: topicIds }, available_for_client: true } },
+      { $match: articleMatch },
     ];
 
     const filterStages = this.buildVersionFilterStages(filters, false, 'published');
@@ -612,21 +619,26 @@ export class ArticleRepository implements IArticleRepository {
     return docs.map((d) => this.aggDocToView(d as Record<string, unknown>));
   }
 
-  /** Returns a single published version visible to external clients, given topic IDs.
+  /** Returns a single published version for the given topic IDs.
+   *  By default restricts to articles marked `available_for_client: true`.
+   *  When `includeUnavailable` is true, ignores that flag (admin endpoint).
    *  Client/topic resolution is the caller's responsibility (ArticleService). */
   async findPublishedVersionByTopicIds(
     topicIds: string[],
     versionId: string,
+    includeUnavailable = false,
   ): Promise<KbArticleVersionView | null> {
     if (!ObjectId.isValid(versionId)) return null;
     if (topicIds.length === 0) return null;
     const vOid = new ObjectId(versionId);
 
-    const article = await this.col.findOne({
+    const articleFilter: Record<string, unknown> = {
       topic_id: { $in: topicIds },
-      available_for_client: true,
       'versions._id': vOid,
-    });
+    };
+    if (!includeUnavailable) articleFilter['available_for_client'] = true;
+
+    const article = await this.col.findOne(articleFilter);
     if (!article) return null;
 
     const version = article.versions.find(

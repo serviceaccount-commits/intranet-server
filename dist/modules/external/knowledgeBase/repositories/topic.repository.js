@@ -8,42 +8,39 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TopicRepository = void 0;
 const inversify_1 = require("inversify");
+const typeorm_1 = require("typeorm");
 const data_source_1 = require("../../../../shared/database/data-source");
 const Topic_entity_1 = require("../entities/Topic.entity");
 let TopicRepository = class TopicRepository {
-    async create(topic, client, user) {
-        topic.client = client;
-        topic.client_id = client.client_id;
-        topic.user = user;
-        topic.user_id = user.user_id;
-        return await data_source_1.AppDataSource.manager.save(topic);
+    get repo() {
+        return data_source_1.AppDataSource.manager.getRepository(Topic_entity_1.Topic);
+    }
+    async create(data) {
+        const topic = this.repo.create(data);
+        return this.repo.save(topic);
     }
     async findAll() {
-        return await data_source_1.AppDataSource.manager.find(Topic_entity_1.Topic);
+        return this.repo.find({ order: { topic_name: 'ASC' } });
     }
     async findAllByClientId(clientId) {
-        return await data_source_1.AppDataSource.manager.find(Topic_entity_1.Topic, {
-            where: {
-                client_id: clientId,
-            },
+        return this.repo.find({
+            where: { client_id: clientId },
+            order: { topic_name: 'ASC' },
         });
+    }
+    async findAllByClientIds(clientIds) {
+        if (clientIds.length === 0)
+            return [];
+        return this.repo.find({ where: { client_id: (0, typeorm_1.In)(clientIds) } });
     }
     async findById(id) {
-        return await data_source_1.AppDataSource.manager.findOne(Topic_entity_1.Topic, {
-            where: {
-                topic_id: id,
-            },
-        });
+        return this.repo.findOne({ where: { topic_id: id } });
     }
-    async findByName(topicName) {
-        return await data_source_1.AppDataSource.manager.findOne(Topic_entity_1.Topic, {
-            where: {
-                topic_name: topicName,
-            },
-        });
+    async findByName(name) {
+        return this.repo.findOne({ where: { topic_name: name } });
     }
     async save(topic) {
-        return await data_source_1.AppDataSource.manager.save(topic);
+        return this.repo.save(topic);
     }
 };
 exports.TopicRepository = TopicRepository;

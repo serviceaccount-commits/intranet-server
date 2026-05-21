@@ -6,10 +6,7 @@ const AnnouncementAcknowledgement_entity_1 = require("../../modules/external/ann
 const AnnouncementRead_entity_1 = require("../../modules/external/announcements/entity/AnnouncementRead.entity");
 const AnnouncementUsers_entity_1 = require("../../modules/external/announcements/entity/AnnouncementUsers.entity");
 const StaffDirectoryOrder_entity_1 = require("../../modules/external/humanResources/entities/StaffDirectoryOrder.entity");
-const Article_entity_1 = require("../../modules/external/knowledgeBase/entities/Article.entity");
-const ArticleVersion_entity_1 = require("../../modules/external/knowledgeBase/entities/ArticleVersion.entity");
 const Client_entity_1 = require("../../modules/external/knowledgeBase/entities/Client.entity");
-const Tag_entity_1 = require("../../modules/external/knowledgeBase/entities/Tag.entity");
 const Topic_entity_1 = require("../../modules/external/knowledgeBase/entities/Topic.entity");
 const Class_entity_1 = require("../../modules/external/training/entities/Class.entity");
 const ClassUserValue_entity_1 = require("../../modules/external/training/entities/ClassUserValue.entity");
@@ -23,6 +20,7 @@ const QuestionType_entity_1 = require("../../modules/external/training/entities/
 const TrainingTopic_entity_1 = require("../../modules/external/training/entities/TrainingTopic.entity");
 const TrainingTopicUserValue_entity_1 = require("../../modules/external/training/entities/TrainingTopicUserValue.entity");
 const UserAnswers_entity_1 = require("../../modules/external/training/entities/UserAnswers.entity");
+const StandaloneExam_entity_1 = require("../../modules/external/training/entities/StandaloneExam.entity");
 const UserExamAttempts_entity_1 = require("../../modules/external/training/entities/UserExamAttempts.entity");
 const Document_entity_1 = require("../../modules/internal/documents/entities/Document.entity");
 const Assignment_entity_1 = require("../../modules/internal/users/entities/Assignment.entity");
@@ -40,10 +38,7 @@ exports.ALL_ENTITIES = [
     AnnouncementRead_entity_1.AnnouncementRead,
     AnnouncementUsers_entity_1.AnnouncementAssignedToUser,
     StaffDirectoryOrder_entity_1.StaffDirectoryOrder,
-    ArticleVersion_entity_1.ArticleVersion,
-    Article_entity_1.Article,
     Client_entity_1.Client,
-    Tag_entity_1.Tag,
     Topic_entity_1.Topic,
     Class_entity_1.Class,
     ClassUserValue_entity_1.ClassUserValue,
@@ -57,6 +52,7 @@ exports.ALL_ENTITIES = [
     TrainingTopic_entity_1.TrainingTopic,
     TrainingTopicUserValue_entity_1.TrainingTopicUserValue,
     UserAnswers_entity_1.UserAnswer,
+    StandaloneExam_entity_1.StandaloneExam,
     UserExamAttempts_entity_1.UserExamAttempt,
     Document_entity_1.Document,
     Assignment_entity_1.Assignment,

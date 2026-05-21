@@ -72,7 +72,6 @@ let TrainingTopicUserValueRepository = class TrainingTopicUserValueRepository {
             return [];
         // --- Manual Placeholder Strategy for IN Clause ---
         const parameters = { userId }; // Start parameters object with userId
-        console.log('PARAMETERS: ', parameters);
         const placeholders = courseIds
             .map((id, index) => {
             const paramName = `courseId_${index}`; // Create unique names like :courseId_0, :courseId_1

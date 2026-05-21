@@ -51,11 +51,7 @@ let UserExamAttemptService = class UserExamAttemptService {
                 throw new BusinessLogicError_1.BusinessLogicError('Exam is not published');
             }
             const classUserValue = await this.classUserValueRepository.findByClassIdAndUserId(exam.class_id, userId);
-            console.log('USER ID');
-            console.log(userId);
             const userExamAttempts = await this.userExamAttemptRepository.findByUserIdAndExamId(userId, validatedData.examId);
-            console.log('USER EXAM ATTEMPTS');
-            console.log(userExamAttempts);
             if (!classUserValue) {
                 throw new BusinessLogicError_1.BusinessLogicError('Class not assigned to user');
             }

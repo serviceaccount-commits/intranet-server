@@ -7,6 +7,14 @@ const articles_controller_1 = require("../controllers/articles.controller");
 const articleController = inversify_config_1.container.get(articles_controller_1.ArticleController);
 const articlesRouter = (0, express_1.Router)();
 exports.articlesRouter = articlesRouter;
+articlesRouter.get('/search', async (req, res, next) => {
+    try {
+        await articleController.searchArticles(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 articlesRouter.post('/', async (req, res, next) => {
     try {
         await articleController.createArticle(req, res);

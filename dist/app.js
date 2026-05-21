@@ -20,11 +20,17 @@ const frontendOrigin = appConfig_1.default.frontendUrl || 'http://localhost:5173
 const corsOptions = {
     origin: [
         frontendOrigin,
+        'https://myparicus.paricus.com',
+        'https://www.myparicus.paricus.com',
+        'https://portal.paricus.com',
+        'https://qa-portal.paricus.com',
+        'https://qa-intranet.vercel.app',
         'http://localhost:3000',
         'http://localhost:8000',
         'http://localhost:8080',
         'http://localhost:4200',
         'http://localhost:5173',
+        'http://localhost:5174',
     ],
     credentials: true,
     exposedHeaders: ['Content-Disposition', 'Content-Type'],

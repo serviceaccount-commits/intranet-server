@@ -83,8 +83,6 @@ let AnnouncementRepository = class AnnouncementRepository {
                 case 'Last-7-days':
                     const last7Days = new Date();
                     last7Days.setDate(last7Days.getDate() - 7);
-                    const last7 = last7Days.toISOString().split('T')[0];
-                    console.log('LAST 7 DAYS: ', last7);
                     queryBuilder.andWhere('announcement.created_at >= :startDate', {
                         startDate: last7Days.toISOString().split('T')[0],
                     });
@@ -99,8 +97,6 @@ let AnnouncementRepository = class AnnouncementRepository {
                 case 'Last-2-months':
                     const last2Months = new Date();
                     last2Months.setMonth(last2Months.getMonth() - 2);
-                    const last2 = last2Months.toISOString().split('T')[0];
-                    console.log('LAST 2 MONTHS: ', last2);
                     queryBuilder.andWhere('announcement.created_at >= :startDate', {
                         startDate: last2Months.toISOString().split('T')[0],
                     });
@@ -117,8 +113,6 @@ let AnnouncementRepository = class AnnouncementRepository {
             }
         }
         else if (startDate !== undefined && endDate !== undefined) {
-            console.log('START DATE: ', startDate);
-            console.log('END DATE: ', endDate);
             // To make the endDate inclusive for the user, we find all records
             // created *before* the start of the *next* day.
             const end = new Date(endDate);
@@ -171,8 +165,6 @@ let AnnouncementRepository = class AnnouncementRepository {
                 case 'Last-7-days':
                     const last7Days = new Date();
                     last7Days.setDate(last7Days.getDate() - 7);
-                    const last7 = last7Days.toISOString().split('T')[0];
-                    console.log('LAST 7 DAYS: ', last7);
                     queryBuilder.andWhere('announcement.created_at >= :startDate', {
                         startDate: last7Days.toISOString().split('T')[0],
                     });
@@ -187,8 +179,6 @@ let AnnouncementRepository = class AnnouncementRepository {
                 case 'Last-2-months':
                     const last2Months = new Date();
                     last2Months.setMonth(last2Months.getMonth() - 2);
-                    const last2 = last2Months.toISOString().split('T')[0];
-                    console.log('LAST 2 MONTHS: ', last2);
                     queryBuilder.andWhere('announcement.created_at >= :startDate', {
                         startDate: last2Months.toISOString().split('T')[0],
                     });
@@ -205,8 +195,6 @@ let AnnouncementRepository = class AnnouncementRepository {
             }
         }
         else if (startDate !== undefined && endDate !== undefined) {
-            console.log('START DATE: ', startDate);
-            console.log('END DATE: ', endDate);
             // To make the endDate inclusive for the user, we find all records
             // created *before* the start of the *next* day.
             const end = new Date(endDate);

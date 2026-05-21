@@ -13,7 +13,6 @@ exports.Topic = void 0;
 const typeorm_1 = require("typeorm");
 const uuid_1 = require("uuid");
 const User_entity_1 = require("../../../internal/users/entities/User.entity");
-const Article_entity_1 = require("./Article.entity");
 const Client_entity_1 = require("./Client.entity");
 let Topic = class Topic extends typeorm_1.BaseEntity {
     topic_id;
@@ -23,7 +22,6 @@ let Topic = class Topic extends typeorm_1.BaseEntity {
     user_id;
     client;
     client_id;
-    articles;
     createdAt;
     updatedAt;
     addId() {
@@ -61,10 +59,6 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Topic.prototype, "client_id", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => Article_entity_1.Article, 'topic'),
-    __metadata("design:type", Array)
-], Topic.prototype, "articles", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

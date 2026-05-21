@@ -44,7 +44,6 @@ let RoleService = class RoleService {
     }
     async getRoleById(roleId) {
         const role = await this.roleRepository.findById(roleId);
-        console.log(role);
         if (!role) {
             throw new NotFoundError_1.NotFoundError(`Role`, roleId);
         }

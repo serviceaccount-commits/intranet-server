@@ -24,7 +24,6 @@ exports.FilterSentAnnouncementSchema = zod_1.z.object({
         .transform((val) => (val ? (Array.isArray(val) ? val : [val]) : undefined))
         .refine((val) => {
         if (val) {
-            console.log('VAL: ', val);
             const newVal = val[0]?.split(',') ? val[0]?.split(',') : [];
             return newVal.every((level) => level === ES_1.default.HIGH || level === ES_1.default.MEDIUM || level === ES_1.default.LOW);
         }

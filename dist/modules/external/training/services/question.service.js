@@ -85,35 +85,25 @@ let QuestionService = class QuestionService {
             }
             let optionsResponse = [];
             if (question.question_type.type_name !== questionType.type_name) {
-                console.log('QUESTION TYPE');
-                console.log(question.question_type.type_name);
-                console.log(questionType.type_name);
                 question.question_type = questionType;
                 question.question_type_id = questionType.question_type_id;
-                console.log('QUESTION TYPE: ', questionType.type_name);
                 if (questionType.type_name === ES_1.default.MULTIPLE_SELECTION) {
                     await this.optionService.deleteAllOptionsFromQuestion(questionId);
-                    console.log('DELETE ALL TRUE FALSE OPTIONS');
                 }
                 else if (questionType.type_name === ES_1.default.TRUE_FALSE) {
                     await this.optionService.deactivateMultipleSelectionOptions(questionId);
-                    console.log('MAKE ALL OPTIONS INACTIVE');
                 }
                 if (questionType.type_name === ES_1.default.TRUE_FALSE && question.options) {
-                    console.log('CREATE TRUE FALSE OPTIONS');
                     optionsResponse =
                         await this.optionService.createTrueFalseOptions(questionId);
                     question.options = [...question.options, ...optionsResponse];
                 }
                 else if (questionType.type_name === ES_1.default.MULTIPLE_SELECTION) {
-                    console.log('existing multiple options AAAAA');
                     const tempOptionsResponse = await this.optionService.activateMultipleSelectionOptions(questionId);
                     question.options = tempOptionsResponse;
                     optionsResponse = tempOptionsResponse;
-                    console.log(question.options);
                 }
             }
-            console.log('SAVING QUESTION');
             const responseQuestion = await this.questionRepository.save(question);
             if (optionsResponse.length === 0 && question.options) {
                 optionsResponse = question.options;
@@ -133,7 +123,6 @@ let QuestionService = class QuestionService {
             if (question.exam.exam_status !== ES_1.default.DRAFT) {
                 throw new BusinessLogicError_1.BusinessLogicError('Exam is not in draft status');
             }
-            console.log('sureee');
             await this.optionService.deleteAllOptionsFromQuestion(questionId);
             await this.questionRepository.delete(questionId);
         });

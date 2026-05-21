@@ -8,110 +8,71 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClientRepository = void 0;
 const inversify_1 = require("inversify");
-const Client_entity_1 = require("../entities/Client.entity");
-const data_source_1 = require("../../../../shared/database/data-source");
 const typeorm_1 = require("typeorm");
+const data_source_1 = require("../../../../shared/database/data-source");
+const Client_entity_1 = require("../entities/Client.entity");
 let ClientRepository = class ClientRepository {
-    async create(client, user) {
-        client.user = user;
-        client.user_id = user.user_id;
-        return await data_source_1.AppDataSource.manager.save(client);
+    get repo() {
+        return data_source_1.AppDataSource.manager.getRepository(Client_entity_1.Client);
+    }
+    async create(data) {
+        const client = this.repo.create(data);
+        return this.repo.save(client);
     }
     async findAll() {
-        return await data_source_1.AppDataSource.manager.find(Client_entity_1.Client);
-    }
-    async findAllByRegionOrdered(region) {
-        return await data_source_1.AppDataSource.manager.find(Client_entity_1.Client, {
-            where: {
-                region: region,
-            },
-            order: {
-                createdAt: 'DESC',
-            },
-        });
+        return this.repo.find({ order: { client_name: 'ASC' } });
     }
     async findAllWithUserId(userId) {
-        return await data_source_1.AppDataSource.manager.find(Client_entity_1.Client, {
-            where: {
-                users: { user_id: userId },
-            },
+        return data_source_1.AppDataSource.manager
+            .createQueryBuilder(Client_entity_1.Client, 'client')
+            .innerJoin('client.users', 'user', 'user.user_id = :userId', { userId })
+            .orderBy('client.client_name', 'ASC')
+            .getMany();
+    }
+    async findAllByRegionOrdered(region) {
+        return this.repo.find({
+            where: { region },
+            order: { createdAt: 'DESC' },
         });
     }
     async findById(id) {
-        return await data_source_1.AppDataSource.manager.findOne(Client_entity_1.Client, {
-            where: {
-                client_id: id,
-            },
-        });
+        return this.repo.findOne({ where: { client_id: id } });
     }
     async findByIds(ids) {
-        if (!ids || ids.length === 0)
+        if (ids.length === 0)
             return [];
-        return await data_source_1.AppDataSource.manager.find(Client_entity_1.Client, {
-            where: {
-                client_id: (0, typeorm_1.In)(ids),
-            },
-        });
+        const { In } = await import('typeorm');
+        return this.repo.find({ where: { client_id: In(ids) } });
     }
     async findBySharedId(sharedId) {
-        return await data_source_1.AppDataSource.manager.findOne(Client_entity_1.Client, {
-            where: {
-                client_shared_id: sharedId,
-            },
-        });
+        return this.repo.findOne({ where: { client_shared_id: sharedId } });
     }
     async findIMClient() {
-        return await data_source_1.AppDataSource.manager.findOne(Client_entity_1.Client, {
-            where: {
-                is_im: true,
-            },
-        });
+        return this.repo.findOne({ where: { is_im: true } });
     }
     async findFLXClient() {
-        return await data_source_1.AppDataSource.manager.findOne(Client_entity_1.Client, {
-            where: {
-                is_flx: true,
-            },
-        });
+        return this.repo.findOne({ where: { is_flx: true } });
     }
-    async findByName(clientName) {
-        return await data_source_1.AppDataSource.manager.findOne(Client_entity_1.Client, {
-            where: {
-                client_name: clientName,
-            },
-        });
+    async findByName(name) {
+        return this.repo.findOne({ where: { client_name: name } });
     }
     async save(client) {
-        return await data_source_1.AppDataSource.manager.save(client);
+        return this.repo.save(client);
     }
     async findAndCountAllFiltered(input) {
-        const { page, limit, search, entity } = input;
-        const queryBuilder = data_source_1.AppDataSource.manager.createQueryBuilder(Client_entity_1.Client, 'client');
-        if (entity) {
-            queryBuilder.andWhere('client.entity = :entity', { entity });
-        }
-        if (search) {
-            queryBuilder.orWhere('client.client_name ILIKE :search', {
-                search: `%${search}%`,
-            });
-            queryBuilder.orWhere('client.primary_contact_name ILIKE :search', {
-                search: `%${search}%`,
-            });
-            queryBuilder.orWhere('client.primary_contact_email ILIKE :search', {
-                search: `%${search}%`,
-            });
-            queryBuilder.orWhere('client.primary_contact_phone ILIKE :search', {
-                search: `%${search}%`,
-            });
-            queryBuilder.orWhere('client.address ILIKE :search', {
-                search: `%${search}%`,
-            });
-        }
-        const [clients, total] = await queryBuilder
-            .skip((page - 1) * limit)
-            .take(limit)
-            .getManyAndCount();
-        return { clients, total };
+        const { search, entity, page, limit } = input;
+        const where = {};
+        if (search)
+            where['client_name'] = (0, typeorm_1.ILike)(`%${search}%`);
+        if (entity)
+            where['entity'] = entity;
+        const [clients, total] = await this.repo.findAndCount({
+            where,
+            order: { client_name: 'ASC' },
+            skip: (page - 1) * limit,
+            take: limit,
+        });
+        return { clients: clients, total };
     }
 };
 exports.ClientRepository = ClientRepository;

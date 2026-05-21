@@ -16,6 +16,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DocumentService = void 0;
+const logger_1 = require("../../../../shared/utils/logger");
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const data_source_1 = require("../../../../shared/database/data-source");
@@ -84,7 +85,6 @@ let DocumentService = class DocumentService {
         });
     }
     async getLocalDocument(documentId, type) {
-        console.log('DOCUMENT ID: ', documentId);
         const filePath = path_1.default.join(__dirname, '../', 'files', type, `${documentId}.txt`);
         const file = await promises_1.default.readFile(filePath, { encoding: 'utf-8' });
         return file;
@@ -92,8 +92,6 @@ let DocumentService = class DocumentService {
     async updateLocalDocument(documentId, type, documentFile) {
         const filename = `${documentId}.txt`;
         const filePath = path_1.default.join(__dirname, '../', 'files', type, filename);
-        console.log('FILE PATH: ');
-        console.log(filePath);
         await promises_1.default.writeFile(filePath, typeof documentFile === 'string'
             ? documentFile
             : documentFile.buffer.toString(), { encoding: 'utf-8' });
@@ -103,7 +101,6 @@ let DocumentService = class DocumentService {
         const filePath = path_1.default.join(__dirname, '../', 'files', type, filename);
         const directory = path_1.default.join(__dirname, '../', 'files', type);
         await promises_1.default.mkdir(directory, { recursive: true });
-        console.log('ANNOUNCEMENT ID: ', documentId);
         await promises_1.default.writeFile(filePath, typeof documentFile === 'string'
             ? documentFile
             : documentFile.buffer.toString(), { encoding: 'utf-8' });
@@ -141,7 +138,7 @@ let DocumentService = class DocumentService {
             return fileContent;
         }
         catch (error) {
-            console.error(`Failed to get document from S3: ${key}`, error);
+            logger_1.logger.error(`Failed to get document from S3: ${key}`, error);
             // Re-throw the error so the calling  can handle it (e.g., return a 404)
             throw error;
         }

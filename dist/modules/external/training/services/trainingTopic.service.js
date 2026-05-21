@@ -125,7 +125,6 @@ let TrainingTopicService = class TrainingTopicService {
         const publishedClassIds = publishedClasses.map((c) => c.class_id);
         // 3 get the user's completion status for these specific published classes
         const classUserValues = await this.classUserValueRepository.findByUserIdAndClassIds(userId, publishedClassIds);
-        console.log('class values: ', classUserValues);
         // 4 create a map for lookup completion status
         const completionStatusMap = new Map();
         classUserValues.forEach((clsUserValue) => {

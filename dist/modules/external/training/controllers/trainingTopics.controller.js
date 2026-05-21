@@ -84,7 +84,6 @@ let TrainingTopicController = class TrainingTopicController {
                 res.sendStatus(400);
                 return;
             }
-            console.log('ahaaaaa');
             const classesWithStatus = await this.trainingTopicService.getPublishedClassesWithUserCompletionStatus(topicId, userId);
             res.status(200).json(classesWithStatus);
         }

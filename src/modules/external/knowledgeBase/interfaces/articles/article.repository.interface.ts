@@ -107,17 +107,23 @@ export interface IArticleRepository {
 
   // ── External client portal ───────────────────────────────────────────────────
 
-  /** Returns published articles for the given topic IDs (available_for_client=true).
+  /** Returns published articles for the given topic IDs.
+   *  By default filters to `available_for_client: true`; pass `includeUnavailable=true`
+   *  from the admin endpoint to bypass that flag.
    *  Client/topic resolution must be done by the caller before invoking this. */
   findPublishedByTopicIds(
     topicIds: string[],
     filters: FilterArticleInput,
+    includeUnavailable?: boolean,
   ): Promise<KbArticleVersionView[]>;
 
   /** Returns a single published version for the given topic IDs.
+   *  By default filters to `available_for_client: true`; pass `includeUnavailable=true`
+   *  to bypass that flag (admin endpoint).
    *  Client/topic resolution must be done by the caller before invoking this. */
   findPublishedVersionByTopicIds(
     topicIds: string[],
     versionId: string,
+    includeUnavailable?: boolean,
   ): Promise<KbArticleVersionView | null>;
 }

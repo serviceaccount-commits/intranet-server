@@ -27,7 +27,6 @@ let PermissionController = class PermissionController {
             res.status(201).json(permission);
         }
         catch (error) {
-            console.log(error);
             res.status(500).json({ error: 'Internal Server Error' });
         }
     }

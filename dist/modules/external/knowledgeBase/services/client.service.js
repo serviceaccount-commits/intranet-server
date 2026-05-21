@@ -17,102 +17,83 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClientService = void 0;
 const inversify_1 = require("inversify");
-const Client_entity_1 = require("../entities/Client.entity");
-const data_source_1 = require("../../../../shared/database/data-source");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const ConflictError_1 = require("../../../../shared/errors/ConflictError");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
-const CreateClientSchema_1 = require("../schema/clients/CreateClientSchema");
 const BusinessLogicError_1 = require("../../../../shared/errors/BusinessLogicError");
+const CreateClientSchema_1 = require("../schema/clients/CreateClientSchema");
 const ES_1 = __importDefault(require("../../../../shared/types/enum/ES"));
 const REGION_1 = __importDefault(require("../../../../shared/types/enum/REGION"));
 let ClientService = class ClientService {
     clientRepository;
-    userRepository;
-    constructor(clientRepository, userRepository) {
+    constructor(clientRepository) {
         this.clientRepository = clientRepository;
-        this.userRepository = userRepository;
     }
     async createClient(input, userId) {
-        const validatedData = CreateClientSchema_1.CreateClientSchema.parse(input);
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const exisitingClient = await this.clientRepository.findByName(validatedData.clientName);
-            if (exisitingClient) {
-                throw new ConflictError_1.ConflictError(`Client with name ${validatedData.clientName} already exists.`);
+        const data = CreateClientSchema_1.CreateClientSchema.parse(input);
+        const existing = await this.clientRepository.findByName(data.clientName);
+        if (existing) {
+            throw new ConflictError_1.ConflictError(`Client "${data.clientName}" already exists.`);
+        }
+        if (data.isFLX && data.isIM) {
+            throw new BusinessLogicError_1.BusinessLogicError('Client cannot be both Flex and IM.');
+        }
+        if (data.isFLX) {
+            const existingFlx = await this.clientRepository.findFLXClient();
+            if (existingFlx)
+                throw new BusinessLogicError_1.BusinessLogicError('A Flex client already exists.');
+        }
+        if (data.isIM) {
+            const existingIm = await this.clientRepository.findIMClient();
+            if (existingIm)
+                throw new BusinessLogicError_1.BusinessLogicError('An IM client already exists.');
+        }
+        const region = data.entity === ES_1.default.PARICUS_LLC ? REGION_1.default.US : REGION_1.default.CO;
+        const clientsInRegion = await this.clientRepository.findAllByRegionOrdered(region);
+        let sharedIdSuffix = 1;
+        if (clientsInRegion.length > 0) {
+            const lastClient = clientsInRegion[0];
+            if (lastClient) {
+                const lastNum = parseInt(lastClient.client_shared_id?.split('_').pop() ?? '0', 10);
+                sharedIdSuffix = isNaN(lastNum) ? 1 : lastNum + 1;
             }
-            const user = await this.userRepository.findUserById(userId);
-            if (!user) {
-                throw new NotFoundError_1.NotFoundError('User', userId);
-            }
-            const clientRegion = validatedData.entity === ES_1.default.PARICUS_LLC ? REGION_1.default.US : REGION_1.default.CO;
-            const clientsWithRegion = await this.clientRepository.findAllByRegionOrdered(clientRegion);
-            let client_shared_id = `PA_${clientRegion.toUpperCase()}_`;
-            if (clientsWithRegion.length === 0) {
-                client_shared_id += '1';
-            }
-            else {
-                const firstClient = clientsWithRegion[0];
-                if (firstClient) {
-                    const lastNumber = parseInt(firstClient.client_shared_id?.split('_').pop() || '0');
-                    client_shared_id += lastNumber + 1;
-                }
-            }
-            if (validatedData.isFLX && validatedData.isIM) {
-                throw new BusinessLogicError_1.BusinessLogicError('Client can not be both Flex and IM');
-            }
-            if (validatedData.isFLX) {
-                const existingFlex = await this.clientRepository.findFLXClient();
-                if (existingFlex) {
-                    throw new BusinessLogicError_1.BusinessLogicError('Flex client already exists');
-                }
-            }
-            if (validatedData.isIM) {
-                const existingIM = await this.clientRepository.findIMClient();
-                if (existingIM) {
-                    throw new BusinessLogicError_1.BusinessLogicError('IM client already exists');
-                }
-            }
-            const newClient = new Client_entity_1.Client();
-            newClient.client_name = validatedData.clientName;
-            newClient.region = clientRegion;
-            newClient.client_shared_id = client_shared_id;
-            newClient.is_flx = validatedData.isFLX || false;
-            newClient.is_im = validatedData.isIM || false;
-            newClient.entity = validatedData.entity;
-            newClient.address = validatedData.address;
-            newClient.primary_contact_name = validatedData.primaryContactName;
-            newClient.primary_contact_email = validatedData.primaryContactEmail;
-            newClient.primary_contact_phone = validatedData.primaryContactPhone;
-            const client = await this.clientRepository.create(newClient, user);
-            user.clients = [...(user.clients || []), client];
-            await this.userRepository.saveUser(user);
-            return client;
+        }
+        const clientSharedId = `PA_${region.toUpperCase()}_${sharedIdSuffix}`;
+        return this.clientRepository.create({
+            client_name: data.clientName,
+            client_shared_id: clientSharedId,
+            region,
+            entity: data.entity,
+            is_im: data.isIM ?? false,
+            is_flx: data.isFLX ?? false,
+            client_edit_available: true,
+            address: data.address ?? null,
+            primary_contact_name: data.primaryContactName ?? null,
+            primary_contact_email: data.primaryContactEmail ?? null,
+            primary_contact_phone: data.primaryContactPhone ?? null,
+            user_id: userId,
         });
     }
     async updateClient(input) {
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const client = await this.clientRepository.findById(input.clientId);
-            if (!client) {
-                throw new NotFoundError_1.NotFoundError('Client', input.clientId);
-            }
-            client.client_name = input.clientName;
-            return await this.clientRepository.save(client);
-        });
+        const client = await this.clientRepository.findById(input.clientId);
+        if (!client)
+            throw new NotFoundError_1.NotFoundError('Client', input.clientId);
+        client.client_name = input.clientName;
+        return this.clientRepository.save(client);
     }
     async getClientsByAccess(userId) {
-        return await this.clientRepository.findAllWithUserId(userId);
+        return this.clientRepository.findAllWithUserId(userId);
     }
     async getClients() {
-        return await this.clientRepository.findAll();
+        return this.clientRepository.findAll();
     }
     async getFilteredClients(input) {
-        return await this.clientRepository.findAndCountAllFiltered(input);
+        return this.clientRepository.findAndCountAllFiltered(input);
     }
     async getClientById(clientId) {
         const client = await this.clientRepository.findById(clientId);
-        if (!client) {
+        if (!client)
             throw new NotFoundError_1.NotFoundError('Client', clientId);
-        }
         return client;
     }
 };
@@ -120,7 +101,6 @@ exports.ClientService = ClientService;
 exports.ClientService = ClientService = __decorate([
     (0, inversify_1.injectable)(),
     __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IClientRepository)),
-    __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserRepository)),
-    __metadata("design:paramtypes", [Object, Object])
+    __metadata("design:paramtypes", [Object])
 ], ClientService);
 //# sourceMappingURL=client.service.js.map

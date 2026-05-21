@@ -21,7 +21,6 @@ let TopicController = class TopicController {
         this.topicService = topicService;
     }
     async createTopic(req, res) {
-        //! should update userId so that it gets retrieved via jwt cookie
         const userId = req.user?.id;
         if (!userId) {
             res.sendStatus(400);

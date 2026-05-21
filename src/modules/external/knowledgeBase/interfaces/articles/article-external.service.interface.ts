@@ -11,4 +11,14 @@ export interface IArticleExternalService {
     clientSharedId: string,
     versionId: string,
   ): Promise<ExternalClientArticleDetail>;
+
+  findAllPublishedByClientSharedId(
+    filters: FilterArticleInput,
+    clientSharedId: string,
+  ): Promise<ExternalClientArticle[]>;
+
+  getArticleByExternalClientAndArticleIdAdmin(
+    clientSharedId: string,
+    versionId: string,
+  ): Promise<ExternalClientArticleDetail>;
 }

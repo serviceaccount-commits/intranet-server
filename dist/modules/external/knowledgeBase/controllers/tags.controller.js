@@ -21,7 +21,6 @@ let TagController = class TagController {
         this.tagService = tagService;
     }
     async createTag(req, res) {
-        //! should update userId so that it gets retrieved via jwt cookie
         let { tagName } = req.body;
         const tag = await this.tagService.createTag(tagName);
         return res.json(tag);
@@ -36,7 +35,7 @@ let TagController = class TagController {
             res.sendStatus(400);
             return;
         }
-        const tag = await this.tagService.getTagById(parseInt(tagId));
+        const tag = await this.tagService.getTagById(tagId);
         return res.json(tag);
     }
 };

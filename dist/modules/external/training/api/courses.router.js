@@ -26,7 +26,6 @@ courseRouter.get('/', async (req, res, next) => {
 });
 courseRouter.get('/:courseId', async (req, res, next) => {
     try {
-        console.log('ON GET COURSE BY ID');
         await courseController.getCourseById(req, res);
     }
     catch (error) {
@@ -52,7 +51,6 @@ courseRouter.get('/admin/created', async (req, res, next) => {
 //getting active/published topics for a specific user
 courseRouter.get('/course/:courseId/progress', async (req, res, next) => {
     try {
-        console.log('recieved');
         await courseController.getCourseTopicsWithProgress(req, res, next);
     }
     catch (error) {

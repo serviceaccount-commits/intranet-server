@@ -124,4 +124,15 @@ export interface IArticleService {
     clientSharedId: string,
     versionId: string,
   ): Promise<ExternalClientArticleDetail>;
+
+  // ── Admin (ignores available_for_client flag) ────────────────────────────────
+  findAllPublishedByClientSharedId(
+    filters: FilterArticleInput,
+    clientSharedId: string,
+  ): Promise<ExternalClientArticle[]>;
+
+  getArticleByExternalClientAndArticleIdAdmin(
+    clientSharedId: string,
+    versionId: string,
+  ): Promise<ExternalClientArticleDetail>;
 }

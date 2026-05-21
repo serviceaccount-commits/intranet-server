@@ -55,8 +55,6 @@ let PermissionService = class PermissionService {
             };
         }
         const parentPermissions = role.parentRole.permissions;
-        console.log('PARENT ROLE: ');
-        console.log(role.parentRole);
         const permissionsIds = permissions.map((permission) => permission.permission_id);
         const parentPermissionsIds = parentPermissions.map((permission) => permission.permission_id);
         return {

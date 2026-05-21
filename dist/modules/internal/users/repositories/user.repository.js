@@ -51,16 +51,13 @@ class UserRepository {
             .leftJoin('user.reportingTo', 'reportsToRel')
             .leftJoin('reportsToRel.reportsToUser', 'reportsToUser');
         if (status !== undefined) {
-            console.log('STATUSES: ', status);
             const stat = status[0]?.split(',');
             if (stat && stat.length > 1) {
-                console.log('MANY STAT', stat);
                 queryBuilder.andWhere('user.status IN (...stat)', {
                     stat: stat,
                 });
             }
             else if (stat && stat.length === 1) {
-                console.log('STATTT: ', stat[0]);
                 queryBuilder.andWhere('user.status = :status', {
                     status: stat[0],
                 });
@@ -85,12 +82,10 @@ class UserRepository {
             }));
         }
         if (roleId !== undefined) {
-            console.log('ROLE IDS: ', roleId);
             queryBuilder.andWhere('user.role_id IN (:...roleIds)', {
                 roleIds: roleId[0]?.split(','),
             });
         }
-        console.log('CLIENT ID IS: ', clientId);
         if (clientId !== undefined && clientId.length > 0) {
             queryBuilder.andWhere('client.client_id IN (:...clientIds)', {
                 clientIds: clientId[0]?.split(','),
