@@ -57,6 +57,7 @@ const CreateVersionSchema_1 = require("../schema/articles/CreateVersionSchema");
 const ai_service_1 = require("../../../../shared/utils/ai.service");
 const kb_constants_1 = require("../kb.constants");
 const articleChunking_service_1 = require("./articleChunking.service");
+const articleSearch_service_1 = require("./articleSearch.service");
 const KB_PERM_VIEW_METADATA = 'kb:article:view:metadata';
 let ArticleService = class ArticleService {
     articleRepository;
@@ -65,13 +66,15 @@ let ArticleService = class ArticleService {
     userRepository;
     tagRepository;
     chunkingService;
-    constructor(articleRepository, topicRepository, clientRepository, userRepository, tagRepository, chunkingService) {
+    searchService;
+    constructor(articleRepository, topicRepository, clientRepository, userRepository, tagRepository, chunkingService, searchService) {
         this.articleRepository = articleRepository;
         this.topicRepository = topicRepository;
         this.clientRepository = clientRepository;
         this.userRepository = userRepository;
         this.tagRepository = tagRepository;
         this.chunkingService = chunkingService;
+        this.searchService = searchService;
     }
     // ─── Helpers ──────────────────────────────────────────────────────────────────
     async getCanSeeDraft(userId) {
@@ -367,6 +370,28 @@ let ArticleService = class ArticleService {
         const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
         if (topicIds.length === 0)
             return [];
+        // When a search query is present we use the hybrid (vector + text) search
+        // service powered by Gemini embeddings instead of a plain Mongo $text
+        // match. We over-fetch from the search service because we still need to
+        // drop articles that are not flagged `available_for_client` for this
+        // public endpoint; without the buffer a few admin-only top hits could
+        // shrink the returned list below the caller's `limit`.
+        const search = filters.search?.trim();
+        if (search) {
+            const overFetch = Math.max(filters.limit * 3, 50);
+            const hits = await this.searchService.search(search, {
+                topicIds,
+                statuses: ['published'],
+                limit: overFetch,
+            });
+            const visible = hits.filter((h) => h.article.available_for_client === true);
+            return visible.slice(0, filters.limit).map((h) => ({
+                article_id: h.article.article_version_id,
+                article_name: h.article.article_name,
+                article_synopsis: h.article.article_synopsis,
+                updated_at: h.article.updatedAt,
+            }));
+        }
         const views = await this.articleRepository.findPublishedByTopicIds(topicIds, filters);
         return views.map((v) => ({
             article_id: v.article_version_id,
@@ -397,6 +422,22 @@ let ArticleService = class ArticleService {
         const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
         if (topicIds.length === 0)
             return [];
+        const search = filters.search?.trim();
+        if (search) {
+            // Admin variant: no post-filter on `available_for_client`, so we can
+            // ask the search service for exactly `limit` hits.
+            const hits = await this.searchService.search(search, {
+                topicIds,
+                statuses: ['published'],
+                limit: filters.limit,
+            });
+            return hits.map((h) => ({
+                article_id: h.article.article_version_id,
+                article_name: h.article.article_name,
+                article_synopsis: h.article.article_synopsis,
+                updated_at: h.article.updatedAt,
+            }));
+        }
         const views = await this.articleRepository.findPublishedByTopicIds(topicIds, filters, true);
         return views.map((v) => ({
             article_id: v.article_version_id,
@@ -432,6 +473,8 @@ exports.ArticleService = ArticleService = __decorate([
     __param(3, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserRepository)),
     __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.ITagRepository)),
     __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleChunkingService)),
-    __metadata("design:paramtypes", [Object, Object, Object, Object, Object, articleChunking_service_1.ArticleChunkingService])
+    __param(6, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleSearchService)),
+    __metadata("design:paramtypes", [Object, Object, Object, Object, Object, articleChunking_service_1.ArticleChunkingService,
+        articleSearch_service_1.ArticleSearchService])
 ], ArticleService);
 //# sourceMappingURL=article.service.js.map

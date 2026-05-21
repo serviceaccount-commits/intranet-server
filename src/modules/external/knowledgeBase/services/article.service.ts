@@ -27,6 +27,7 @@ import { CreateVersionInput, CreateVersionSchema } from '../schema/articles/Crea
 import { generateArticleSynopsis } from '../../../../shared/utils/ai.service';
 import { ARTICLE_LOCK_DURATION_MS } from '../kb.constants';
 import { ArticleChunkingService } from './articleChunking.service';
+import { ArticleSearchService } from './articleSearch.service';
 
 const KB_PERM_VIEW_METADATA = 'kb:article:view:metadata';
 
@@ -45,6 +46,8 @@ export class ArticleService implements IArticleService {
     private tagRepository: ITagRepository,
     @inject(TYPES.IArticleChunkingService)
     private chunkingService: ArticleChunkingService,
+    @inject(TYPES.IArticleSearchService)
+    private searchService: ArticleSearchService,
   ) {}
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -441,6 +444,29 @@ export class ArticleService implements IArticleService {
     const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
     if (topicIds.length === 0) return [];
 
+    // When a search query is present we use the hybrid (vector + text) search
+    // service powered by Gemini embeddings instead of a plain Mongo $text
+    // match. We over-fetch from the search service because we still need to
+    // drop articles that are not flagged `available_for_client` for this
+    // public endpoint; without the buffer a few admin-only top hits could
+    // shrink the returned list below the caller's `limit`.
+    const search = filters.search?.trim();
+    if (search) {
+      const overFetch = Math.max(filters.limit * 3, 50);
+      const hits = await this.searchService.search(search, {
+        topicIds,
+        statuses: ['published'],
+        limit: overFetch,
+      });
+      const visible = hits.filter((h) => h.article.available_for_client === true);
+      return visible.slice(0, filters.limit).map((h) => ({
+        article_id: h.article.article_version_id,
+        article_name: h.article.article_name,
+        article_synopsis: h.article.article_synopsis,
+        updated_at: h.article.updatedAt,
+      }));
+    }
+
     const views = await this.articleRepository.findPublishedByTopicIds(topicIds, filters);
 
     return views.map((v) => ({
@@ -480,6 +506,23 @@ export class ArticleService implements IArticleService {
   ): Promise<ExternalClientArticle[]> {
     const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
     if (topicIds.length === 0) return [];
+
+    const search = filters.search?.trim();
+    if (search) {
+      // Admin variant: no post-filter on `available_for_client`, so we can
+      // ask the search service for exactly `limit` hits.
+      const hits = await this.searchService.search(search, {
+        topicIds,
+        statuses: ['published'],
+        limit: filters.limit,
+      });
+      return hits.map((h) => ({
+        article_id: h.article.article_version_id,
+        article_name: h.article.article_name,
+        article_synopsis: h.article.article_synopsis,
+        updated_at: h.article.updatedAt,
+      }));
+    }
 
     const views = await this.articleRepository.findPublishedByTopicIds(
       topicIds,
