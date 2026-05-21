@@ -4,6 +4,7 @@ import { inject, injectable } from 'inversify';
 import { TYPES } from '../../../../shared/config/containerTypes';
 import { ITopicService } from '../interfaces/topics/topic.service.interface';
 import { CreateTopicInput } from '../schema/topics/CreateTopicSchema';
+import { UpdateTopicInput } from '../schema/topics/UpdateTopicSchema';
 
 @injectable()
 export class TopicController {
@@ -22,6 +23,22 @@ export class TopicController {
 
     const topic = await this.topicService.createTopic(input);
 
+    return res.json(topic);
+  }
+
+  async updateTopic(req: Request, res: Response) {
+    const { topicId } = req.params;
+    if (!topicId) {
+      res.sendStatus(400);
+      return;
+    }
+
+    const input: UpdateTopicInput = {
+      ...(req.body as Omit<UpdateTopicInput, 'topicId'>),
+      topicId,
+    };
+
+    const topic = await this.topicService.updateTopic(input);
     return res.json(topic);
   }
 

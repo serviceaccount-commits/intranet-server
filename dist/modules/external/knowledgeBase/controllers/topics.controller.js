@@ -31,6 +31,19 @@ let TopicController = class TopicController {
         const topic = await this.topicService.createTopic(input);
         return res.json(topic);
     }
+    async updateTopic(req, res) {
+        const { topicId } = req.params;
+        if (!topicId) {
+            res.sendStatus(400);
+            return;
+        }
+        const input = {
+            ...req.body,
+            topicId,
+        };
+        const topic = await this.topicService.updateTopic(input);
+        return res.json(topic);
+    }
     async getTopics(req, res) {
         const { clientId } = req.params;
         if (!clientId) {

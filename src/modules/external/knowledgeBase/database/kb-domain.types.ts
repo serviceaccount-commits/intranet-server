@@ -203,6 +203,8 @@ export interface KbTopic {
   topic_name: string;
   topic_edit_available: boolean;
   client_id: string;
+  /** Self-reference for folder hierarchy. NULL = root folder of the client. */
+  parent_topic_id: string | null;
   user_id: string | null;
   createdAt: Date;
   updatedAt: Date;

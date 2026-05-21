@@ -42,6 +42,19 @@ let TopicRepository = class TopicRepository {
     async save(topic) {
         return this.repo.save(topic);
     }
+    /** Returns every topic_id under the given root (root NOT included), walking
+     *  the parent_topic_id self-reference recursively. Used to validate cycles
+     *  and to power "include subfolders" reads. */
+    async findAllDescendantIds(rootTopicId) {
+        const rows = await this.repo.query(`WITH RECURSIVE descendants AS (
+         SELECT topic_id FROM topics WHERE parent_topic_id = $1
+         UNION ALL
+         SELECT t.topic_id FROM topics t
+         INNER JOIN descendants d ON t.parent_topic_id = d.topic_id
+       )
+       SELECT topic_id FROM descendants`, [rootTopicId]);
+        return rows.map((r) => r.topic_id);
+    }
 };
 exports.TopicRepository = TopicRepository;
 exports.TopicRepository = TopicRepository = __decorate([

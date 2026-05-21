@@ -17,6 +17,7 @@ const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 const AuthenticationError_1 = require("../../../../shared/errors/AuthenticationError");
+const ValidationError_1 = require("../../../../shared/errors/ValidationError");
 const CreateTopicSchema_1 = require("../schema/topics/CreateTopicSchema");
 const UpdateTopicSchema_1 = require("../schema/topics/UpdateTopicSchema");
 let TopicService = class TopicService {
@@ -38,10 +39,21 @@ let TopicService = class TopicService {
         const client = await this.clientRepository.findById(data.clientId);
         if (!client)
             throw new NotFoundError_1.NotFoundError('Client', data.clientId);
+        // When a parent is given, validate that it belongs to the same client so
+        // folders never get tangled across tenants.
+        if (data.parentTopicId) {
+            const parent = await this.topicRepository.findById(data.parentTopicId);
+            if (!parent)
+                throw new NotFoundError_1.NotFoundError('Topic', data.parentTopicId);
+            if (parent.client_id !== client.client_id) {
+                throw new ValidationError_1.ValidationError('Parent folder belongs to a different client.');
+            }
+        }
         return this.topicRepository.create({
             topic_name: data.topicName,
             topic_edit_available: true,
             client_id: client.client_id,
+            parent_topic_id: data.parentTopicId ?? null,
             user_id: data.userId,
         });
     }
@@ -50,7 +62,32 @@ let TopicService = class TopicService {
         const topic = await this.topicRepository.findById(data.topicId);
         if (!topic)
             throw new NotFoundError_1.NotFoundError('Topic', data.topicId);
-        topic.topic_name = data.topicName;
+        if (data.topicName !== undefined) {
+            topic.topic_name = data.topicName;
+        }
+        // `parentTopicId` is only checked when the key is present in the payload.
+        // Sending `null` explicitly means "promote to root of the client".
+        if (Object.prototype.hasOwnProperty.call(data, 'parentTopicId')) {
+            const newParentId = data.parentTopicId ?? null;
+            if (newParentId === topic.topic_id) {
+                throw new ValidationError_1.ValidationError('A folder cannot be its own parent.');
+            }
+            if (newParentId !== null) {
+                const parent = await this.topicRepository.findById(newParentId);
+                if (!parent)
+                    throw new NotFoundError_1.NotFoundError('Topic', newParentId);
+                if (parent.client_id !== topic.client_id) {
+                    throw new ValidationError_1.ValidationError('Parent folder belongs to a different client.');
+                }
+                // Reject if the candidate parent is one of this topic's descendants:
+                // that would create a cycle.
+                const descendantIds = await this.topicRepository.findAllDescendantIds(topic.topic_id);
+                if (descendantIds.includes(newParentId)) {
+                    throw new ValidationError_1.ValidationError('Cannot move a folder under one of its own descendants.');
+                }
+            }
+            topic.parent_topic_id = newParentId;
+        }
         return this.topicRepository.save(topic);
     }
     async getTopics(clientId) {

@@ -44,4 +44,21 @@ export class TopicRepository implements ITopicRepository {
   async save(topic: KbTopic): Promise<KbTopic> {
     return this.repo.save(topic as Topic) as Promise<KbTopic>;
   }
+
+  /** Returns every topic_id under the given root (root NOT included), walking
+   *  the parent_topic_id self-reference recursively. Used to validate cycles
+   *  and to power "include subfolders" reads. */
+  async findAllDescendantIds(rootTopicId: string): Promise<string[]> {
+    const rows: Array<{ topic_id: string }> = await this.repo.query(
+      `WITH RECURSIVE descendants AS (
+         SELECT topic_id FROM topics WHERE parent_topic_id = $1
+         UNION ALL
+         SELECT t.topic_id FROM topics t
+         INNER JOIN descendants d ON t.parent_topic_id = d.topic_id
+       )
+       SELECT topic_id FROM descendants`,
+      [rootTopicId],
+    );
+    return rows.map((r) => r.topic_id);
+  }
 }

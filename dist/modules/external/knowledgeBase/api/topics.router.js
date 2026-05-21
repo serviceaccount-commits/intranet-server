@@ -32,4 +32,12 @@ topicsRouter.get('/:topicId', async (req, res, next) => {
         next(error);
     }
 });
+topicsRouter.put('/:topicId', async (req, res, next) => {
+    try {
+        await topicController.updateTopic(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 //# sourceMappingURL=topics.router.js.map

@@ -22,6 +22,10 @@ let Topic = class Topic extends typeorm_1.BaseEntity {
     user_id;
     client;
     client_id;
+    // Self-referencing FK: when present, this topic is a sub-folder of another
+    // topic under the same client. NULL = root folder of the client.
+    parent;
+    parent_topic_id;
     createdAt;
     updatedAt;
     addId() {
@@ -59,6 +63,15 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Topic.prototype, "client_id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => Topic, { nullable: true, onDelete: 'SET NULL' }),
+    (0, typeorm_1.JoinColumn)({ name: 'parent_topic_id' }),
+    __metadata("design:type", Object)
+], Topic.prototype, "parent", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'uuid', nullable: true }),
+    __metadata("design:type", Object)
+], Topic.prototype, "parent_topic_id", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

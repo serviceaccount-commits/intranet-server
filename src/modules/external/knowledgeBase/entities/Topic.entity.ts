@@ -38,6 +38,14 @@ export class Topic extends BaseEntity {
   @Column({ nullable: true })
   client_id!: string;
 
+  // Self-referencing FK: when present, this topic is a sub-folder of another
+  // topic under the same client. NULL = root folder of the client.
+  @ManyToOne(() => Topic, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'parent_topic_id' })
+  parent?: Topic | null;
+  @Column({ type: 'uuid', nullable: true })
+  parent_topic_id!: string | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

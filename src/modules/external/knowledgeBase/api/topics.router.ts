@@ -39,4 +39,16 @@ topicsRouter.get(
     }
   },
 );
+
+topicsRouter.put(
+  '/:topicId',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await topicController.updateTopic(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 export { topicsRouter };

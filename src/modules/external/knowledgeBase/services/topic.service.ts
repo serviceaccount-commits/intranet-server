@@ -7,6 +7,7 @@ import { IUserRepository } from '../../../internal/users/interfaces/users/user.r
 import { KbTopic } from '../database/kb-domain.types';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
 import { AuthenticationError } from '../../../../shared/errors/AuthenticationError';
+import { ValidationError } from '../../../../shared/errors/ValidationError';
 import { CreateTopicInput, CreateTopicSchema } from '../schema/topics/CreateTopicSchema';
 import { UpdateTopicInput, UpdateTopicSchema } from '../schema/topics/UpdateTopicSchema';
 
@@ -32,10 +33,23 @@ export class TopicService implements ITopicService {
     const client = await this.clientRepository.findById(data.clientId);
     if (!client) throw new NotFoundError('Client', data.clientId);
 
+    // When a parent is given, validate that it belongs to the same client so
+    // folders never get tangled across tenants.
+    if (data.parentTopicId) {
+      const parent = await this.topicRepository.findById(data.parentTopicId);
+      if (!parent) throw new NotFoundError('Topic', data.parentTopicId);
+      if (parent.client_id !== client.client_id) {
+        throw new ValidationError(
+          'Parent folder belongs to a different client.',
+        );
+      }
+    }
+
     return this.topicRepository.create({
       topic_name: data.topicName,
       topic_edit_available: true,
       client_id: client.client_id,
+      parent_topic_id: data.parentTopicId ?? null,
       user_id: data.userId,
     });
   }
@@ -46,7 +60,41 @@ export class TopicService implements ITopicService {
     const topic = await this.topicRepository.findById(data.topicId);
     if (!topic) throw new NotFoundError('Topic', data.topicId);
 
-    topic.topic_name = data.topicName;
+    if (data.topicName !== undefined) {
+      topic.topic_name = data.topicName;
+    }
+
+    // `parentTopicId` is only checked when the key is present in the payload.
+    // Sending `null` explicitly means "promote to root of the client".
+    if (Object.prototype.hasOwnProperty.call(data, 'parentTopicId')) {
+      const newParentId = data.parentTopicId ?? null;
+
+      if (newParentId === topic.topic_id) {
+        throw new ValidationError('A folder cannot be its own parent.');
+      }
+
+      if (newParentId !== null) {
+        const parent = await this.topicRepository.findById(newParentId);
+        if (!parent) throw new NotFoundError('Topic', newParentId);
+        if (parent.client_id !== topic.client_id) {
+          throw new ValidationError(
+            'Parent folder belongs to a different client.',
+          );
+        }
+        // Reject if the candidate parent is one of this topic's descendants:
+        // that would create a cycle.
+        const descendantIds =
+          await this.topicRepository.findAllDescendantIds(topic.topic_id);
+        if (descendantIds.includes(newParentId)) {
+          throw new ValidationError(
+            'Cannot move a folder under one of its own descendants.',
+          );
+        }
+      }
+
+      topic.parent_topic_id = newParentId;
+    }
+
     return this.topicRepository.save(topic);
   }
 
