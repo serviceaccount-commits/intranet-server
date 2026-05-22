@@ -358,16 +358,29 @@ let ArticleService = class ArticleService {
         await this.articleRepository.updateVersionsStatus(versionIds, 'unpublished');
     }
     // ─── External client portal ───────────────────────────────────────────────────
-    /** Resolves clientSharedId → client → topics, then delegates to the repo. */
-    async resolveTopicIdsForSharedClient(clientSharedId) {
+    /** Resolves clientSharedId → client → topics, then delegates to the repo.
+     *  Optional `topicId` narrows the result to that single topic (validated to
+     *  belong to the client). */
+    async resolveTopicIdsForSharedClient(clientSharedId, topicId) {
         const client = await this.clientRepository.findBySharedId(clientSharedId);
         if (!client)
             return [];
         const topics = await this.topicRepository.findAllByClientId(client.client_id);
-        return topics.map((t) => t.topic_id);
+        if (!topicId) {
+            return topics.map((t) => t.topic_id);
+        }
+        return topics.filter((t) => t.topic_id === topicId).map((t) => t.topic_id);
     }
-    async findSharedArticlesByClientSharedId(filters, clientSharedId) {
-        const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+    /** Lists every topic of a client. Used by the portal sidebar to render the
+     *  folder tree (consumer rebuilds the tree from `parent_topic_id`). */
+    async getTopicsBySharedClientId(clientSharedId) {
+        const client = await this.clientRepository.findBySharedId(clientSharedId);
+        if (!client)
+            throw new NotFoundError_1.NotFoundError('Client', clientSharedId);
+        return this.topicRepository.findAllByClientId(client.client_id);
+    }
+    async findSharedArticlesByClientSharedId(filters, clientSharedId, topicId) {
+        const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, topicId);
         if (topicIds.length === 0)
             return [];
         // When a search query is present we use the hybrid (vector + text) search
@@ -419,8 +432,8 @@ let ArticleService = class ArticleService {
         };
     }
     // ─── Admin variants (ignore `available_for_client` flag) ─────────────────────
-    async findAllPublishedByClientSharedId(filters, clientSharedId) {
-        const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+    async findAllPublishedByClientSharedId(filters, clientSharedId, topicId) {
+        const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, topicId);
         if (topicIds.length === 0)
             return [];
         const search = filters.search?.trim();

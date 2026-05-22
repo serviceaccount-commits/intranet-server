@@ -17,6 +17,7 @@ import {
   PaginatedArticlesResult,
   ArticleLockInfo,
   KbTag,
+  KbTopic,
 } from '../database/kb-domain.types';
 import { ValidationError } from '../../../../shared/errors/ValidationError';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
@@ -428,20 +429,37 @@ export class ArticleService implements IArticleService {
 
   // ─── External client portal ───────────────────────────────────────────────────
 
-  /** Resolves clientSharedId → client → topics, then delegates to the repo. */
-  private async resolveTopicIdsForSharedClient(clientSharedId: string): Promise<string[]> {
+  /** Resolves clientSharedId → client → topics, then delegates to the repo.
+   *  Optional `topicId` narrows the result to that single topic (validated to
+   *  belong to the client). */
+  private async resolveTopicIdsForSharedClient(
+    clientSharedId: string,
+    topicId?: string,
+  ): Promise<string[]> {
     const client = await this.clientRepository.findBySharedId(clientSharedId);
     if (!client) return [];
 
     const topics = await this.topicRepository.findAllByClientId(client.client_id);
-    return topics.map((t) => t.topic_id);
+    if (!topicId) {
+      return topics.map((t) => t.topic_id);
+    }
+    return topics.filter((t) => t.topic_id === topicId).map((t) => t.topic_id);
+  }
+
+  /** Lists every topic of a client. Used by the portal sidebar to render the
+   *  folder tree (consumer rebuilds the tree from `parent_topic_id`). */
+  async getTopicsBySharedClientId(clientSharedId: string): Promise<KbTopic[]> {
+    const client = await this.clientRepository.findBySharedId(clientSharedId);
+    if (!client) throw new NotFoundError('Client', clientSharedId);
+    return this.topicRepository.findAllByClientId(client.client_id);
   }
 
   async findSharedArticlesByClientSharedId(
     filters: FilterArticleInput,
     clientSharedId: string,
+    topicId?: string,
   ): Promise<ExternalClientArticle[]> {
-    const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+    const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, topicId);
     if (topicIds.length === 0) return [];
 
     // When a search query is present we use the hybrid (vector + text) search
@@ -504,8 +522,9 @@ export class ArticleService implements IArticleService {
   async findAllPublishedByClientSharedId(
     filters: FilterArticleInput,
     clientSharedId: string,
+    topicId?: string,
   ): Promise<ExternalClientArticle[]> {
-    const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+    const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, topicId);
     if (topicIds.length === 0) return [];
 
     const search = filters.search?.trim();

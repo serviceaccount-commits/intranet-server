@@ -3,6 +3,7 @@ import {
   PaginatedArticlesResult,
   ArticleLockInfo,
   KbTag,
+  KbTopic,
 } from '../../database/kb-domain.types';
 import { CreateVersionInput } from '../../schema/articles/CreateVersionSchema';
 import { FilterArticleInput } from '../../schema/articles/FilterArticleSchema';
@@ -121,6 +122,7 @@ export interface IArticleService {
   findSharedArticlesByClientSharedId(
     filters: FilterArticleInput,
     clientSharedId: string,
+    topicId?: string,
   ): Promise<ExternalClientArticle[]>;
 
   getArticleByExternalClientAndArticleId(
@@ -128,10 +130,15 @@ export interface IArticleService {
     versionId: string,
   ): Promise<ExternalClientArticleDetail>;
 
+  /** Topics belonging to a client (with parent_topic_id) so the portal sidebar
+   *  can build the folder tree. Available to both client and admin keys. */
+  getTopicsBySharedClientId(clientSharedId: string): Promise<KbTopic[]>;
+
   // ── Admin (ignores available_for_client flag) ────────────────────────────────
   findAllPublishedByClientSharedId(
     filters: FilterArticleInput,
     clientSharedId: string,
+    topicId?: string,
   ): Promise<ExternalClientArticle[]>;
 
   getArticleByExternalClientAndArticleIdAdmin(

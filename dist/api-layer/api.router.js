@@ -24,7 +24,9 @@ const options_router_1 = require("../modules/external/training/api/options.route
 const auth_router_1 = require("../modules/internal/auth/api/auth.router");
 const external_router_1 = require("../modules/external/knowledgeBase/api/external.router");
 const external_clients_router_1 = require("../modules/external/knowledgeBase/api/external-clients.router");
+const external_topics_router_1 = require("../modules/external/knowledgeBase/api/external-topics.router");
 const admin_router_1 = require("../modules/external/knowledgeBase/api/admin.router");
+const admin_topics_router_1 = require("../modules/external/knowledgeBase/api/admin-topics.router");
 const apiKey_middleware_1 = require("../modules/internal/auth/middlewares/apiKey.middleware");
 const adminApiKey_middleware_1 = require("../modules/internal/auth/middlewares/adminApiKey.middleware");
 const documents_router_1 = require("../modules/internal/documents/api/documents.router");
@@ -51,7 +53,9 @@ apiLayerRouter.use('/v1/questionTypes', auth_middleware_1.authenticateJWT, quest
 apiLayerRouter.use('/v1/options', auth_middleware_1.authenticateJWT, options_router_1.optionsRouter);
 apiLayerRouter.use('/v1/external/articles', apiKey_middleware_1.verifyApiKey, external_router_1.externalRouter);
 apiLayerRouter.use('/v1/external/clients', apiKey_middleware_1.verifyApiKey, external_clients_router_1.externalClientsRouter);
+apiLayerRouter.use('/v1/external/topics', apiKey_middleware_1.verifyApiKey, external_topics_router_1.externalTopicsRouter);
 apiLayerRouter.use('/v1/external/admin/articles', adminApiKey_middleware_1.verifyAdminApiKey, admin_router_1.adminRouter);
+apiLayerRouter.use('/v1/external/admin/topics', adminApiKey_middleware_1.verifyAdminApiKey, admin_topics_router_1.adminTopicsRouter);
 apiLayerRouter.use('/v1/auth', auth_router_1.authRouter);
 apiLayerRouter.use('/v1/documents', documents_router_1.documentsRouter);
 exports.default = apiLayerRouter;

@@ -562,6 +562,8 @@ export class ArticleController {
   ) {
     const { clientSharedId } = req.params;
     const validationResult = FilterArticleSchema.parse(req.query);
+    const topicId =
+      typeof req.query['topicId'] === 'string' ? req.query['topicId'] : undefined;
 
     if (!clientSharedId) {
       res.sendStatus(400);
@@ -573,9 +575,34 @@ export class ArticleController {
         await this.articleService.findSharedArticlesByClientSharedId(
           validationResult,
           clientSharedId,
+          topicId,
         );
 
       return res.json(articles);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res
+          .status(error.statusCode || 400)
+          .json({ message: error.message });
+      }
+      next(error);
+    }
+  }
+
+  /** Topics of a client for the portal sidebar tree (public, client API key). */
+  async getExternalClientTopics(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    const { clientSharedId } = req.params;
+    if (!clientSharedId) {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      const topics = await this.articleService.getTopicsBySharedClientId(clientSharedId);
+      return res.json(topics);
     } catch (error) {
       if (error instanceof AppError) {
         return res
@@ -637,6 +664,8 @@ export class ArticleController {
   ) {
     const { clientSharedId } = req.params;
     const validationResult = FilterArticleSchema.parse(req.query);
+    const topicId =
+      typeof req.query['topicId'] === 'string' ? req.query['topicId'] : undefined;
 
     if (!clientSharedId) {
       res.sendStatus(400);
@@ -648,9 +677,34 @@ export class ArticleController {
         await this.articleService.findAllPublishedByClientSharedId(
           validationResult,
           clientSharedId,
+          topicId,
         );
 
       return res.json(articles);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res
+          .status(error.statusCode || 400)
+          .json({ message: error.message });
+      }
+      next(error);
+    }
+  }
+
+  /** Topics of a client for the portal sidebar tree (admin variant). */
+  async getAdminClientTopics(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    const { clientSharedId } = req.params;
+    if (!clientSharedId) {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      const topics = await this.articleService.getTopicsBySharedClientId(clientSharedId);
+      return res.json(topics);
     } catch (error) {
       if (error instanceof AppError) {
         return res
