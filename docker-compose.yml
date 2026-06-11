@@ -9,6 +9,13 @@ services:
       MONGO_INITDB_DATABASE: paricus_kb
     volumes:
       - paricus_mongo_data:/data/db
+    # Without rotation the json log grew past 1GB twice (2026-05-06, 2026-06-11)
+    # and filled the VM disk, silently breaking the API's Mongo connection.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
