@@ -24,6 +24,12 @@ import { NotFoundError } from '../../../../shared/errors/NotFoundError';
 import { BusinessLogicError } from '../../../../shared/errors/BusinessLogicError';
 import { FilterArticleInput } from '../schema/articles/FilterArticleSchema';
 import { MoveArticleInput, MoveArticleSchema } from '../schema/clients/MoveArticleSchema';
+import {
+  CreateManagedArticleInput,
+  CreateManagedArticleSchema,
+  UpdateManagedArticleInput,
+  UpdateManagedArticleSchema,
+} from '../schema/manage/ManagedArticleSchemas';
 import { CreateVersionInput, CreateVersionSchema } from '../schema/articles/CreateVersionSchema';
 import { generateArticleSynopsis } from '../../../../shared/utils/ai.service';
 import { ARTICLE_LOCK_DURATION_MS } from '../kb.constants';
@@ -463,6 +469,152 @@ export class ArticleService implements IArticleService {
     const client = await this.clientRepository.findBySharedId(clientSharedId);
     if (!client) throw new NotFoundError('Client', clientSharedId);
     return this.topicRepository.findAllByClientId(client.client_id);
+  }
+
+  // ─── Managed writes (portal write API, X-API-Key INTERNAL_WRITE_API_KEY) ──────
+
+  /** Actor recorded on portal-originated writes. Not a real intranet user —
+   *  valid UUID shape so Postgres user joins don't error; resolves to null.
+   *  The human-readable author goes in `updated_by_name` (actorName). */
+  private static readonly PORTAL_ACTOR_ID = '00000000-0000-4000-8000-000000000001';
+
+  private async resolveOwnedVersion(
+    clientSharedId: string,
+    versionId: string,
+  ): Promise<KbArticleVersionView> {
+    const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+    const version = await this.articleRepository.findByVersionId(versionId);
+    if (!version || !topicIds.includes(version.topic_id)) {
+      throw new NotFoundError('Article version', versionId);
+    }
+    return version;
+  }
+
+  private async assertNotLockedForManage(versionId: string): Promise<void> {
+    const lockInfo = await this.articleRepository.getLockInfo(versionId);
+    const now = new Date();
+    if (
+      lockInfo?.locked_by_user_id &&
+      lockInfo.lock_expires_at &&
+      lockInfo.lock_expires_at > now
+    ) {
+      throw new BusinessLogicError(
+        'Article is currently being edited in the intranet. Try again later.',
+      );
+    }
+  }
+
+  async createManagedArticle(
+    clientSharedId: string,
+    input: CreateManagedArticleInput,
+  ): Promise<KbArticleVersionView> {
+    const data = CreateManagedArticleSchema.parse(input);
+
+    const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, data.topicId);
+    if (topicIds.length === 0) throw new NotFoundError('Topic', data.topicId);
+
+    // Portal-created articles go live immediately: published + visible.
+    const created = await this.articleRepository.createArticle(
+      data.topicId,
+      ArticleService.PORTAL_ACTOR_ID,
+      data.articleName,
+      data.content,
+      data.actorName,
+    );
+    if (data.synopsis) {
+      await this.articleRepository.updateVersionSynopsis(
+        created.article_version_id,
+        data.synopsis,
+      );
+    }
+    await this.articleRepository.updateVersionStatus(created.article_version_id, 'published');
+    await this.articleRepository.setAvailableForClient(created.article_version_id, true);
+
+    if (data.content && data.content.trim()) {
+      await this.chunkingService.processVersionSafe(
+        created.article_id,
+        created.article_version_id,
+        data.content,
+      );
+    }
+
+    const updated = await this.articleRepository.findByVersionId(created.article_version_id);
+    return updated ?? created;
+  }
+
+  async updateManagedArticle(
+    clientSharedId: string,
+    versionId: string,
+    input: UpdateManagedArticleInput,
+  ): Promise<KbArticleVersionView> {
+    const data = UpdateManagedArticleSchema.parse(input);
+
+    const current = await this.resolveOwnedVersion(clientSharedId, versionId);
+    if (current.article_status !== 'published') {
+      throw new BusinessLogicError('Only published articles can be edited from the portal.');
+    }
+    await this.assertNotLockedForManage(versionId);
+
+    // Live edit = new version in the history, published immediately; the
+    // previous version becomes outdated so lists keep a single live version.
+    const newVersion = await this.articleRepository.addVersion(versionId, {
+      useVersionAsTemplate: true,
+      userId: ArticleService.PORTAL_ACTOR_ID,
+      updatedByName: data.actorName,
+    });
+
+    if (data.content !== undefined) {
+      await this.articleRepository.updateVersionContent(
+        newVersion.article_version_id,
+        data.content,
+        ArticleService.PORTAL_ACTOR_ID,
+        data.actorName,
+      );
+    }
+    if (data.articleName !== undefined) {
+      await this.articleRepository.updateVersionName(
+        newVersion.article_version_id,
+        data.articleName,
+      );
+    }
+    if (data.synopsis !== undefined) {
+      await this.articleRepository.updateVersionSynopsis(
+        newVersion.article_version_id,
+        data.synopsis,
+      );
+    }
+
+    await this.articleRepository.updateVersionStatus(versionId, 'outdated');
+    await this.articleRepository.updateVersionStatus(newVersion.article_version_id, 'published');
+
+    // Drop chunks of the outdated version; index the new content for search.
+    await this.chunkingService.processVersionSafe(newVersion.article_id, versionId, '');
+    const finalContent = data.content !== undefined ? data.content : newVersion.content;
+    if (finalContent && finalContent.trim()) {
+      await this.chunkingService.processVersionSafe(
+        newVersion.article_id,
+        newVersion.article_version_id,
+        finalContent,
+      );
+    }
+
+    const updated = await this.articleRepository.findByVersionId(newVersion.article_version_id);
+    return updated ?? newVersion;
+  }
+
+  async archiveManagedArticle(
+    clientSharedId: string,
+    versionId: string,
+  ): Promise<{ article_status: string }> {
+    const current = await this.resolveOwnedVersion(clientSharedId, versionId);
+    if (current.article_status !== 'published') {
+      throw new BusinessLogicError('Only published articles can be archived from the portal.');
+    }
+    await this.assertNotLockedForManage(versionId);
+
+    await this.articleRepository.updateVersionStatus(versionId, 'archived');
+    await this.chunkingService.processVersionSafe(current.article_id, versionId, '');
+    return { article_status: 'archived' };
   }
 
   async findSharedArticlesByClientSharedId(

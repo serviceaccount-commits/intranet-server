@@ -44,6 +44,7 @@ import { ArticleRepository } from '../../modules/external/knowledgeBase/reposito
 import { IArticleService } from '../../modules/external/knowledgeBase/interfaces/articles/article.service.interface';
 import { ArticleService } from '../../modules/external/knowledgeBase/services/article.service';
 import { ArticleController } from '../../modules/external/knowledgeBase/controllers/articles.controller';
+import { ManageArticlesController } from '../../modules/external/knowledgeBase/controllers/manage-articles.controller';
 import { IArticleChunkRepository } from '../../modules/external/knowledgeBase/interfaces/articles/articleChunk.repository.interface';
 import { ArticleChunkRepository } from '../../modules/external/knowledgeBase/repositories/articleChunk.repository';
 import { ArticleChunkingService } from '../../modules/external/knowledgeBase/services/articleChunking.service';
@@ -189,6 +190,7 @@ container
   .to(ArticleRepository);
 container.bind<IArticleService>(TYPES.IArticleService).to(ArticleService);
 container.bind<ArticleController>(ArticleController).toSelf();
+container.bind<ManageArticlesController>(ManageArticlesController).toSelf();
 
 container
   .bind<IArticleChunkRepository>(TYPES.IArticleChunkRepository)

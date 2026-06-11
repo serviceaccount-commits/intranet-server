@@ -8,6 +8,10 @@ import {
 import { CreateVersionInput } from '../../schema/articles/CreateVersionSchema';
 import { FilterArticleInput } from '../../schema/articles/FilterArticleSchema';
 import { MoveArticleInput } from '../../schema/clients/MoveArticleSchema';
+import {
+  CreateManagedArticleInput,
+  UpdateManagedArticleInput,
+} from '../../schema/manage/ManagedArticleSchemas';
 
 export interface ExternalClientArticle {
   article_id: string;
@@ -139,6 +143,21 @@ export interface IArticleService {
   /** Topics belonging to a client (with parent_topic_id) so the portal sidebar
    *  can build the folder tree. Available to both client and admin keys. */
   getTopicsBySharedClientId(clientSharedId: string): Promise<KbTopic[]>;
+
+  // ── Managed writes (portal write API) ────────────────────────────────────────
+  createManagedArticle(
+    clientSharedId: string,
+    input: CreateManagedArticleInput,
+  ): Promise<KbArticleVersionView>;
+  updateManagedArticle(
+    clientSharedId: string,
+    versionId: string,
+    input: UpdateManagedArticleInput,
+  ): Promise<KbArticleVersionView>;
+  archiveManagedArticle(
+    clientSharedId: string,
+    versionId: string,
+  ): Promise<{ article_status: string }>;
 
   // ── Admin (ignores available_for_client flag) ────────────────────────────────
   findAllPublishedByClientSharedId(
