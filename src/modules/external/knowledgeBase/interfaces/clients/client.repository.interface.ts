@@ -13,5 +13,7 @@ export interface IClientRepository {
   findFLXClient(): Promise<KbClient | null>;
   findByName(name: string): Promise<KbClient | null>;
   save(client: KbClient): Promise<KbClient>;
+  /** Adds a row to the user_clients access table so the user sees the client in the KB tree. */
+  addUserAccess(clientId: string, userId: string): Promise<void>;
   findAndCountAllFiltered(input: FilterClientInput): Promise<PaginatedKbClientResult>;
 }

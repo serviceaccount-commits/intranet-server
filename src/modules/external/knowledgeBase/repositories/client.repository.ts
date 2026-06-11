@@ -67,6 +67,14 @@ export class ClientRepository implements IClientRepository {
     return this.repo.save(client as Client) as Promise<KbClient>;
   }
 
+  async addUserAccess(clientId: string, userId: string): Promise<void> {
+    await AppDataSource.manager
+      .createQueryBuilder()
+      .relation(Client, 'users')
+      .of(clientId)
+      .add(userId);
+  }
+
   async findAndCountAllFiltered(input: FilterClientInput): Promise<PaginatedKbClientResult> {
     const { search, entity, page, limit } = input;
 

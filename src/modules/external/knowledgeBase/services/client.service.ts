@@ -72,6 +72,10 @@ export class ClientService implements IClientService {
       user_id: userId,
     });
 
+    // The KB tree only lists clients present in the user_clients access
+    // table — grant the creator access so the new client is visible to them.
+    await this.clientRepository.addUserAccess(client.client_id, userId);
+
     // Every new client gets a root folder so articles can be filed
     // immediately without a separate "create folder" step.
     await this.topicRepository.create({
