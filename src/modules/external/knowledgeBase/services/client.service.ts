@@ -2,7 +2,6 @@ import { inject, injectable } from 'inversify';
 import { TYPES } from '../../../../shared/config/containerTypes';
 import { IClientService } from '../interfaces/clients/client.service.interface';
 import { IClientRepository } from '../interfaces/clients/client.repository.interface';
-import { ITopicRepository } from '../interfaces/topics/topic.repository.interface';
 import { KbClient, PaginatedKbClientResult } from '../database/kb-domain.types';
 import { ConflictError } from '../../../../shared/errors/ConflictError';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
@@ -18,8 +17,6 @@ export class ClientService implements IClientService {
   constructor(
     @inject(TYPES.IClientRepository)
     private clientRepository: IClientRepository,
-    @inject(TYPES.ITopicRepository)
-    private topicRepository: ITopicRepository,
   ) {}
 
   async createClient(input: CreateClientInput, userId: string): Promise<KbClient> {
@@ -75,16 +72,6 @@ export class ClientService implements IClientService {
     // The KB tree only lists clients present in the user_clients access
     // table — grant the creator access so the new client is visible to them.
     await this.clientRepository.addUserAccess(client.client_id, userId);
-
-    // Every new client gets a root folder so articles can be filed
-    // immediately without a separate "create folder" step.
-    await this.topicRepository.create({
-      topic_name: 'Articles',
-      topic_edit_available: true,
-      client_id: client.client_id,
-      parent_topic_id: null,
-      user_id: userId,
-    });
 
     return client;
   }
