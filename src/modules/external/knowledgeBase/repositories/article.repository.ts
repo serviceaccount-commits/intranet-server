@@ -486,6 +486,15 @@ export class ArticleRepository implements IArticleRepository {
     );
   }
 
+  async setAvailableForClient(versionId: string, available: boolean): Promise<void> {
+    if (!ObjectId.isValid(versionId)) throw new NotFoundError('Version', versionId);
+    // Root-level article field (not per-version), so no positional operator.
+    await this.col.updateOne(
+      { 'versions._id': new ObjectId(versionId) },
+      { $set: { available_for_client: available, updatedAt: new Date() } },
+    );
+  }
+
   // ─── Edit locks ───────────────────────────────────────────────────────────────
 
   async acquireLock(versionId: string, userId: string, expiresAt: Date): Promise<void> {

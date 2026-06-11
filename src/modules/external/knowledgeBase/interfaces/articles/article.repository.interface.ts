@@ -84,6 +84,9 @@ export interface IArticleRepository {
 
   updateVersionsStatus(versionIds: string[], status: ArticleStatus): Promise<void>;
 
+  /** Sets the root-level available_for_client flag on the article containing versionId. */
+  setAvailableForClient(versionId: string, available: boolean): Promise<void>;
+
   // ── Edit locks ───────────────────────────────────────────────────────────────
 
   acquireLock(versionId: string, userId: string, expiresAt: Date): Promise<void>;

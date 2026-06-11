@@ -118,6 +118,12 @@ export interface IArticleService {
   publishVersions(versionIds: string[]): Promise<void>;
   unpublishVersions(versionIds: string[]): Promise<void>;
 
+  /** Persists the "available for client" flag that gates external/portal visibility. */
+  setArticleAvailability(
+    versionId: string,
+    available: boolean,
+  ): Promise<{ available_for_client: boolean }>;
+
   // ── External client ──────────────────────────────────────────────────────────
   findSharedArticlesByClientSharedId(
     filters: FilterArticleInput,

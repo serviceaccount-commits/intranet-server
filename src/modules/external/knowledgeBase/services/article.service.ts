@@ -401,6 +401,17 @@ export class ArticleService implements IArticleService {
     return updated;
   }
 
+  async setArticleAvailability(
+    versionId: string,
+    available: boolean,
+  ): Promise<{ available_for_client: boolean }> {
+    const article = await this.articleRepository.findByVersionId(versionId);
+    if (!article) throw new NotFoundError('Article version', versionId);
+
+    await this.articleRepository.setAvailableForClient(versionId, available);
+    return { available_for_client: available };
+  }
+
   async publishVersions(versionIds: string[]): Promise<void> {
     const versions = await this.articleRepository.findByVersionIds(versionIds);
     if (versions.length === 0) throw new BusinessLogicError('No versions found.');

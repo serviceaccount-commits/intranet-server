@@ -171,6 +171,17 @@ articlesRouter.put(
 );
 
 articlesRouter.put(
+  '/:articleId/availability',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await articleController.updateArticleAvailability(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+articlesRouter.put(
   '/move/:topicId',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
