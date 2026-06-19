@@ -27,6 +27,7 @@ import { externalTopicsRouter } from '../modules/external/knowledgeBase/api/exte
 import { adminRouter } from '../modules/external/knowledgeBase/api/admin.router';
 import { adminTopicsRouter } from '../modules/external/knowledgeBase/api/admin-topics.router';
 import { manageArticlesRouter } from '../modules/external/knowledgeBase/api/manage-articles.router';
+import { manageTopicsRouter } from '../modules/external/knowledgeBase/api/manage-topics.router';
 import { verifyApiKey } from '../modules/internal/auth/middlewares/apiKey.middleware';
 import { verifyAdminApiKey } from '../modules/internal/auth/middlewares/adminApiKey.middleware';
 import { verifyWriteApiKey } from '../modules/internal/auth/middlewares/writeApiKey.middleware';
@@ -60,6 +61,7 @@ apiLayerRouter.use('/v1/external/topics', verifyApiKey, externalTopicsRouter);
 apiLayerRouter.use('/v1/external/admin/articles', verifyAdminApiKey, adminRouter);
 apiLayerRouter.use('/v1/external/admin/topics', verifyAdminApiKey, adminTopicsRouter);
 apiLayerRouter.use('/v1/external/manage/articles', verifyWriteApiKey, manageArticlesRouter);
+apiLayerRouter.use('/v1/external/manage/topics', verifyWriteApiKey, manageTopicsRouter);
 apiLayerRouter.use('/v1/auth', authRouter);
 apiLayerRouter.use('/v1/documents', documentsRouter);
 
