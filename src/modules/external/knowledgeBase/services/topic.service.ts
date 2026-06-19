@@ -106,12 +106,6 @@ export class TopicService implements ITopicService {
 
   // ─── Managed writes (portal write API, X-API-Key INTERNAL_WRITE_API_KEY) ──────
 
-  /** Actor recorded on portal-originated folder writes. Not a real intranet
-   *  user — valid UUID shape so Postgres user joins don't error. Mirrors
-   *  ArticleService.PORTAL_ACTOR_ID. */
-  private static readonly PORTAL_ACTOR_ID =
-    '00000000-0000-4000-8000-000000000001';
-
   /**
    * Create a folder/subfolder on behalf of a portal user. The client is
    * resolved from `clientSharedId`; no real intranet user is required.
@@ -137,12 +131,14 @@ export class TopicService implements ITopicService {
       }
     }
 
+    // Portal users are not intranet users, so there is no owning user_id.
+    // The column is nullable; the human author is conveyed via actorName.
     return this.topicRepository.create({
       topic_name: data.topicName,
       topic_edit_available: true,
       client_id: client.client_id,
       parent_topic_id: data.parentTopicId ?? null,
-      user_id: TopicService.PORTAL_ACTOR_ID,
+      user_id: null,
     });
   }
 
