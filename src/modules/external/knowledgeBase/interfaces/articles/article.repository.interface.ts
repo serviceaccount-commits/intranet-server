@@ -1,5 +1,6 @@
 import {
   KbArticleVersionView,
+  KbClientCopyView,
   PaginatedArticlesResult,
   ArticleLockInfo,
   ArticleStatus,
@@ -87,6 +88,10 @@ export interface IArticleRepository {
   /** Sets the root-level available_for_client flag on the article containing versionId. */
   setAvailableForClient(versionId: string, available: boolean): Promise<void>;
 
+  /** Sets the root-level available_for_client flag by article id (used when the
+   *  caller only has the client copy id, e.g. portal writes). */
+  setAvailableForClientByArticleId(articleId: string, available: boolean): Promise<void>;
+
   // ── Edit locks ───────────────────────────────────────────────────────────────
 
   acquireLock(versionId: string, userId: string, expiresAt: Date): Promise<void>;
@@ -135,4 +140,34 @@ export interface IArticleRepository {
   findAllPublishedVersionsForChunking(
     topicIds?: string[],
   ): Promise<Array<{ article_id: string; version_id: string; content: string }>>;
+
+  // ── Client copy (dual view) ──────────────────────────────────────────────────
+
+  getClientCopyByArticleId(articleId: string): Promise<KbClientCopyView | null>;
+  getClientCopyByCopyId(copyId: string): Promise<KbClientCopyView | null>;
+  updateClientCopy(
+    articleId: string,
+    fields: { content?: string; name?: string; synopsis?: string },
+    updatedBy: string,
+    updatedByName?: string | null,
+  ): Promise<KbClientCopyView | null>;
+  regenerateClientCopyFromVersion(
+    articleId: string,
+    versionId: string,
+    updatedBy: string,
+    updatedByName?: string | null,
+  ): Promise<KbClientCopyView | null>;
+  findClientFacingByTopicIds(
+    topicIds: string[],
+    includeUnavailable?: boolean,
+  ): Promise<KbClientCopyView[]>;
+  findClientFacingByCopyId(
+    topicIds: string[],
+    copyId: string,
+    includeUnavailable?: boolean,
+  ): Promise<KbClientCopyView | null>;
+  findClientCopyViewsByCopyIds(copyIds: string[]): Promise<KbClientCopyView[]>;
+  findAllClientCopiesForChunking(
+    topicIds?: string[],
+  ): Promise<Array<{ article_id: string; copy_id: string; content: string }>>;
 }

@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { KbArticleChunk } from '../../database/kb-domain.types';
+import { KbArticleChunk, ChunkAudience } from '../../database/kb-domain.types';
 
 export interface ChunkToPersist {
   chunk_index: number;
@@ -17,6 +17,7 @@ export interface ChunkSearchResult {
   chunk_index: number;
   content: string;
   embedding: number[];
+  audience: ChunkAudience;
 }
 
 export interface IArticleChunkRepository {
@@ -27,6 +28,7 @@ export interface IArticleChunkRepository {
     articleId: ObjectId,
     versionId: ObjectId,
     chunks: ChunkToPersist[],
+    audience?: ChunkAudience,
   ): Promise<void>;
 
   /** Looks up existing chunks by content_hash, used to reuse embeddings when

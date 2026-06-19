@@ -6,7 +6,7 @@ import {
   ChunkToPersist,
   ChunkSearchResult,
 } from '../interfaces/articles/articleChunk.repository.interface';
-import { KbArticleChunk } from '../database/kb-domain.types';
+import { KbArticleChunk, ChunkAudience } from '../database/kb-domain.types';
 import { getArticleChunksCollection } from '../database/kb-collections';
 import { getMongoDb } from '../../../../shared/database/mongo-connection';
 
@@ -20,6 +20,7 @@ export class ArticleChunkRepository implements IArticleChunkRepository {
     articleId: ObjectId,
     versionId: ObjectId,
     chunks: ChunkToPersist[],
+    audience: ChunkAudience = 'internal',
   ): Promise<void> {
     await this.col.deleteMany({ version_id: versionId });
 
@@ -36,6 +37,7 @@ export class ArticleChunkRepository implements IArticleChunkRepository {
       token_count: c.token_count,
       embedding: c.embedding,
       embedding_model: c.embedding_model,
+      audience,
       createdAt: now,
       updatedAt: now,
     }));
@@ -57,7 +59,7 @@ export class ArticleChunkRepository implements IArticleChunkRepository {
 
   async loadAllForSearch(): Promise<ChunkSearchResult[]> {
     const docs = await this.col
-      .find({}, { projection: { content: 1, embedding: 1, article_id: 1, version_id: 1, chunk_index: 1 } })
+      .find({}, { projection: { content: 1, embedding: 1, article_id: 1, version_id: 1, chunk_index: 1, audience: 1 } })
       .toArray();
     return docs.map((d) => ({
       _id: d._id.toString(),
@@ -66,6 +68,8 @@ export class ArticleChunkRepository implements IArticleChunkRepository {
       chunk_index: d.chunk_index,
       content: d.content,
       embedding: d.embedding,
+      // Chunks written before dual-view have no audience → treat as internal.
+      audience: d.audience ?? 'internal',
     }));
   }
 

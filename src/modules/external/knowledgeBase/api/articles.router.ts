@@ -181,6 +181,40 @@ articlesRouter.put(
   },
 );
 
+// ── Client copy (dual view): keyed by the current internal version id ─────────
+articlesRouter.get(
+  '/:articleId/client-copy',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await articleController.getArticleClientCopy(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+articlesRouter.put(
+  '/:articleId/client-copy',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await articleController.saveArticleClientCopy(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+articlesRouter.post(
+  '/:articleId/client-copy/regenerate',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await articleController.regenerateArticleClientCopy(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 articlesRouter.put(
   '/move/:topicId',
   async (req: Request, res: Response, next: NextFunction) => {

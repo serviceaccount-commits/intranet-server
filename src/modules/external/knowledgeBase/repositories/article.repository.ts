@@ -9,6 +9,8 @@ import {
   KbArticle,
   KbArticleVersion,
   KbArticleVersionView,
+  KbClientCopy,
+  KbClientCopyView,
   PaginatedArticlesResult,
   ArticleLockInfo,
   ArticleStatus,
@@ -101,6 +103,26 @@ export class ArticleRepository implements IArticleRepository {
     return stages;
   }
 
+  /** Flattens an article root + its client copy into a serializable view. */
+  private toClientCopyView(article: KbArticle, copy: KbClientCopy): KbClientCopyView {
+    return {
+      article_id: article._id.toString(),
+      topic_id: article.topic_id,
+      available_for_client: article.available_for_client,
+      client_copy_id: copy._id.toString(),
+      article_name: copy.article_name,
+      article_synopsis: copy.article_synopsis,
+      content: copy.content,
+      updated_by: copy.updated_by,
+      updated_by_name: copy.updated_by_name ?? null,
+      seeded_from_version_id: copy.seeded_from_version_id
+        ? copy.seeded_from_version_id.toString()
+        : null,
+      createdAt: copy.createdAt,
+      updatedAt: copy.updatedAt,
+    };
+  }
+
   /** Maps an aggregation result (after $unwind + $addFields) back to a view. */
   private aggDocToView(doc: Record<string, unknown>): KbArticleVersionView {
     const v = doc['versions'] as Record<string, unknown>;
@@ -161,6 +183,22 @@ export class ArticleRepository implements IArticleRepository {
       updatedAt: now,
     };
 
+    // Saving the first draft also generates the client-facing copy, seeded
+    // from this version. It is then edited independently of the internal track.
+    const clientCopy: KbClientCopy = {
+      _id: new ObjectId(),
+      article_name: articleName,
+      article_synopsis: '',
+      content,
+      content_text: this.htmlToText(content),
+      content_storage: 'inline',
+      updated_by: userId,
+      updated_by_name: updatedByName,
+      seeded_from_version_id: versionId,
+      createdAt: now,
+      updatedAt: now,
+    };
+
     const doc: KbArticle = {
       _id: articleId,
       topic_id: topicId,
@@ -169,6 +207,7 @@ export class ArticleRepository implements IArticleRepository {
       lock_expires_at: null,
       available_for_client: false,
       versions: [firstVersion],
+      client_copy: clientCopy,
       createdAt: now,
       updatedAt: now,
     };
@@ -495,6 +534,14 @@ export class ArticleRepository implements IArticleRepository {
     );
   }
 
+  async setAvailableForClientByArticleId(articleId: string, available: boolean): Promise<void> {
+    if (!ObjectId.isValid(articleId)) throw new NotFoundError('Article', articleId);
+    await this.col.updateOne(
+      { _id: new ObjectId(articleId) },
+      { $set: { available_for_client: available, updatedAt: new Date() } },
+    );
+  }
+
   // ─── Edit locks ───────────────────────────────────────────────────────────────
 
   async acquireLock(versionId: string, userId: string, expiresAt: Date): Promise<void> {
@@ -686,5 +733,171 @@ export class ArticleRepository implements IArticleRepository {
       .toArray();
 
     return docs as Array<{ article_id: string; version_id: string; content: string }>;
+  }
+
+  // ─── Client copy (dual view) ────────────────────────────────────────────────
+
+  async getClientCopyByArticleId(articleId: string): Promise<KbClientCopyView | null> {
+    if (!ObjectId.isValid(articleId)) return null;
+    const article = await this.col.findOne({ _id: new ObjectId(articleId) });
+    if (!article || !article.client_copy) return null;
+    return this.toClientCopyView(article, article.client_copy);
+  }
+
+  async getClientCopyByCopyId(copyId: string): Promise<KbClientCopyView | null> {
+    if (!ObjectId.isValid(copyId)) return null;
+    const article = await this.col.findOne({ 'client_copy._id': new ObjectId(copyId) });
+    if (!article || !article.client_copy) return null;
+    return this.toClientCopyView(article, article.client_copy);
+  }
+
+  async updateClientCopy(
+    articleId: string,
+    fields: { content?: string; name?: string; synopsis?: string },
+    updatedBy: string,
+    updatedByName: string | null = null,
+  ): Promise<KbClientCopyView | null> {
+    if (!ObjectId.isValid(articleId)) return null;
+    const now = new Date();
+    const set: Record<string, unknown> = {
+      'client_copy.updated_by': updatedBy,
+      'client_copy.updated_by_name': updatedByName,
+      'client_copy.updatedAt': now,
+      updatedAt: now,
+    };
+    if (fields.content !== undefined) {
+      set['client_copy.content'] = fields.content;
+      set['client_copy.content_text'] = this.htmlToText(fields.content);
+    }
+    if (fields.name !== undefined) set['client_copy.article_name'] = fields.name;
+    if (fields.synopsis !== undefined) set['client_copy.article_synopsis'] = fields.synopsis;
+
+    await this.col.updateOne(
+      { _id: new ObjectId(articleId), 'client_copy._id': { $exists: true } },
+      { $set: set },
+    );
+    return this.getClientCopyByArticleId(articleId);
+  }
+
+  /** Overwrites the client copy from one of the article's internal versions. */
+  async regenerateClientCopyFromVersion(
+    articleId: string,
+    versionId: string,
+    updatedBy: string,
+    updatedByName: string | null = null,
+  ): Promise<KbClientCopyView | null> {
+    if (!ObjectId.isValid(articleId) || !ObjectId.isValid(versionId)) return null;
+    const vOid = new ObjectId(versionId);
+    const article = await this.col.findOne({ _id: new ObjectId(articleId) });
+    if (!article) return null;
+    const version = article.versions.find((v) => v._id.equals(vOid));
+    if (!version) throw new NotFoundError('Version', versionId);
+
+    const now = new Date();
+    const copyId = article.client_copy?._id ?? new ObjectId();
+    const newCopy: KbClientCopy = {
+      _id: copyId,
+      article_name: version.article_name,
+      article_synopsis: version.article_synopsis,
+      content: version.content,
+      content_text: this.htmlToText(version.content),
+      content_storage: 'inline',
+      updated_by: updatedBy,
+      updated_by_name: updatedByName,
+      seeded_from_version_id: vOid,
+      createdAt: article.client_copy?.createdAt ?? now,
+      updatedAt: now,
+    };
+    await this.col.updateOne(
+      { _id: article._id },
+      { $set: { client_copy: newCopy, updatedAt: now } },
+    );
+    return this.toClientCopyView(article, newCopy);
+  }
+
+  /** Client-facing list: one client copy per article for the given topics.
+   *  Filters to `available_for_client: true` unless `includeUnavailable`. */
+  async findClientFacingByTopicIds(
+    topicIds: string[],
+    includeUnavailable = false,
+  ): Promise<KbClientCopyView[]> {
+    if (topicIds.length === 0) return [];
+    const match: Record<string, unknown> = {
+      topic_id: { $in: topicIds },
+      'client_copy._id': { $exists: true },
+    };
+    if (!includeUnavailable) match['available_for_client'] = true;
+
+    const articles = await this.col
+      .find(match)
+      .sort({ 'client_copy.updatedAt': -1 })
+      .toArray();
+
+    return articles
+      .filter((a) => a.client_copy)
+      .map((a) => this.toClientCopyView(a, a.client_copy!));
+  }
+
+  /** Single client copy by its copy id, scoped to the client's topics.
+   *  Filters to `available_for_client: true` unless `includeUnavailable`. */
+  async findClientFacingByCopyId(
+    topicIds: string[],
+    copyId: string,
+    includeUnavailable = false,
+  ): Promise<KbClientCopyView | null> {
+    if (!ObjectId.isValid(copyId) || topicIds.length === 0) return null;
+    const match: Record<string, unknown> = {
+      topic_id: { $in: topicIds },
+      'client_copy._id': new ObjectId(copyId),
+    };
+    if (!includeUnavailable) match['available_for_client'] = true;
+
+    const article = await this.col.findOne(match);
+    if (!article || !article.client_copy) return null;
+    return this.toClientCopyView(article, article.client_copy);
+  }
+
+  /** Resolves client copy views for a set of copy ids (used by client search).
+   *  No availability/topic filter — the caller applies those. */
+  async findClientCopyViewsByCopyIds(copyIds: string[]): Promise<KbClientCopyView[]> {
+    const oids = copyIds
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    if (oids.length === 0) return [];
+
+    const articles = await this.col
+      .find({ 'client_copy._id': { $in: oids } })
+      .toArray();
+
+    const views: KbClientCopyView[] = [];
+    for (const article of articles) {
+      if (article.client_copy) views.push(this.toClientCopyView(article, article.client_copy));
+    }
+    return views;
+  }
+
+  /** Every (article_id, client_copy_id, content) triple for re-chunking client
+   *  copies. Optional `topicIds` scopes to a client. */
+  async findAllClientCopiesForChunking(
+    topicIds?: string[],
+  ): Promise<Array<{ article_id: string; copy_id: string; content: string }>> {
+    const match: Record<string, unknown> = { 'client_copy._id': { $exists: true } };
+    if (topicIds && topicIds.length > 0) match['topic_id'] = { $in: topicIds };
+
+    const docs = await this.col
+      .aggregate([
+        { $match: match },
+        {
+          $project: {
+            _id: 0,
+            article_id: { $toString: '$_id' },
+            copy_id: { $toString: '$client_copy._id' },
+            content: '$client_copy.content',
+          },
+        },
+      ])
+      .toArray();
+
+    return docs as Array<{ article_id: string; copy_id: string; content: string }>;
   }
 }

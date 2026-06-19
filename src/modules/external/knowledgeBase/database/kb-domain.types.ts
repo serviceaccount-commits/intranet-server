@@ -12,6 +12,13 @@ export const ArticleStatusEnum = z.enum([
 ]);
 export type ArticleStatus = z.infer<typeof ArticleStatusEnum>;
 
+// Which audience a chunk (and its embedding) belongs to. Internal version
+// chunks power the intranet search; client-copy chunks power the external /
+// portal search. Kept separate so internal language never leaks into client
+// search results.
+export const ChunkAudienceEnum = z.enum(['internal', 'client']);
+export type ChunkAudience = z.infer<typeof ChunkAudienceEnum>;
+
 // ─── Tag ─────────────────────────────────────────────────────────────────────
 
 export const KbTagSchema = z.object({
@@ -56,6 +63,31 @@ export const KbArticleVersionSchema = z.object({
 
 export type KbArticleVersion = z.infer<typeof KbArticleVersionSchema>;
 
+// ─── Client copy (embedded inside Article, single editable copy) ──────────────
+
+/**
+ * The client-facing copy of an article. Seeded from the first internal version
+ * when the article is created, then edited INDEPENDENTLY (internal edits never
+ * touch it). The client only ever sees this copy — never the internal versions.
+ * There is at most one per article and it has no version history by design.
+ */
+export const KbClientCopySchema = z.object({
+  _id: z.instanceof(ObjectId),
+  article_name: z.string().min(0).max(500),
+  article_synopsis: z.string().max(2000),
+  content: z.string(),
+  content_text: z.string().optional(),
+  content_storage: z.enum(['inline', 's3', 'local']).default('inline'),
+  updated_by: z.string().uuid().nullable(),
+  updated_by_name: z.string().nullable().optional(),
+  // Which internal version this copy was last seeded/regenerated from.
+  seeded_from_version_id: z.instanceof(ObjectId).nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type KbClientCopy = z.infer<typeof KbClientCopySchema>;
+
 // ─── Article Chunk (separate collection, one document per chunk) ──────────────
 
 export const KbArticleChunkSchema = z.object({
@@ -68,6 +100,10 @@ export const KbArticleChunkSchema = z.object({
   token_count: z.number().int().positive(),
   embedding: z.array(z.number()),
   embedding_model: z.string(),
+  // 'internal' = chunk of an internal version (intranet search); 'client' =
+  // chunk of the client copy (external/portal search). Defaults to 'internal'
+  // for backward compatibility with chunks written before dual-view.
+  audience: ChunkAudienceEnum.default('internal'),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -84,10 +120,13 @@ export const KbArticleSchema = z.object({
   // Edit lock
   locked_by_user_id: z.string().uuid().nullable(),
   lock_expires_at: z.date().nullable(),
-  // External client visibility
+  // External client visibility — now governs the client copy's exposure
   available_for_client: z.boolean(),
-  // Embedded versions array — all versions live here
+  // Embedded versions array — all INTERNAL versions live here
   versions: z.array(KbArticleVersionSchema),
+  // The single client-facing copy (seeded on create, edited independently).
+  // Nullable/optional for documents created before dual-view (backfilled).
+  client_copy: KbClientCopySchema.nullable().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -157,6 +196,26 @@ export interface KbArticleVersionView {
   updated_by_name: string | null;
   published_by: string | null;
   published_at: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Flat, serializable view of an article's client copy. `client_copy_id` is the
+ * id the external/portal API exposes as the article id (so the client never
+ * sees an internal version id).
+ */
+export interface KbClientCopyView {
+  article_id: string;
+  topic_id: string;
+  available_for_client: boolean;
+  client_copy_id: string;
+  article_name: string;
+  article_synopsis: string;
+  content: string;
+  updated_by: string | null;
+  updated_by_name: string | null;
+  seeded_from_version_id: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

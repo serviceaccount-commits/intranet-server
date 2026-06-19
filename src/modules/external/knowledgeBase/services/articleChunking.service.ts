@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 
 import { TYPES } from '../../../../shared/config/containerTypes';
 import { IArticleChunkRepository, ChunkToPersist } from '../interfaces/articles/articleChunk.repository.interface';
+import { ChunkAudience } from '../database/kb-domain.types';
 import { chunkHtmlContent } from '../../../../shared/utils/chunker';
 import { getEmbedding, EMBEDDING_MODEL } from '../../../../shared/utils/ai.service';
 import { logger } from '../../../../shared/utils/logger';
@@ -30,6 +31,7 @@ export class ArticleChunkingService {
     articleId: string,
     versionId: string,
     html: string,
+    audience: ChunkAudience = 'internal',
   ): Promise<ProcessVersionResult> {
     const articleOid = new ObjectId(articleId);
     const versionOid = new ObjectId(versionId);
@@ -79,7 +81,7 @@ export class ArticleChunkingService {
       });
     }
 
-    await this.chunkRepository.replaceChunksForVersion(articleOid, versionOid, toPersist);
+    await this.chunkRepository.replaceChunksForVersion(articleOid, versionOid, toPersist, audience);
     this.searchService.invalidateCache();
 
     return {
@@ -91,11 +93,16 @@ export class ArticleChunkingService {
 
   /** Wrapper for consumers (article create/update flows) that should never
    *  fail the parent operation if chunking fails. Errors are logged. */
-  async processVersionSafe(articleId: string, versionId: string, html: string): Promise<void> {
+  async processVersionSafe(
+    articleId: string,
+    versionId: string,
+    html: string,
+    audience: ChunkAudience = 'internal',
+  ): Promise<void> {
     try {
-      const result = await this.processVersion(articleId, versionId, html);
+      const result = await this.processVersion(articleId, versionId, html, audience);
       logger.info(
-        `[chunking] version=${versionId} chunks=${result.chunksCreated} reused=${result.reusedFromCache} embedded=${result.newlyEmbedded}`,
+        `[chunking] version=${versionId} audience=${audience} chunks=${result.chunksCreated} reused=${result.reusedFromCache} embedded=${result.newlyEmbedded}`,
       );
     } catch (error) {
       logger.error(`[chunking] failed for version=${versionId}`, error);

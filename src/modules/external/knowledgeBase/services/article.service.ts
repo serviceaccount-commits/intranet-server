@@ -14,6 +14,7 @@ import {
 } from '../interfaces/articles/article.service.interface';
 import {
   KbArticleVersionView,
+  KbClientCopyView,
   PaginatedArticlesResult,
   ArticleLockInfo,
   KbTag,
@@ -85,9 +86,80 @@ export class ArticleService implements IArticleService {
     const updatedByName = `${user.first_name} ${user.last_name}`;
     const created = await this.articleRepository.createArticle(topicId, userId, articleName, content, updatedByName);
     if (content && content.trim()) {
-      await this.chunkingService.processVersionSafe(created.article_id, created.article_version_id, content);
+      await this.chunkingService.processVersionSafe(created.article_id, created.article_version_id, content, 'internal');
+      // The client copy was seeded with the same content on create; chunk it
+      // too (audience 'client') so it is searchable once made available.
+      const copy = await this.articleRepository.getClientCopyByArticleId(created.article_id);
+      if (copy) {
+        await this.chunkingService.processVersionSafe(copy.article_id, copy.client_copy_id, content, 'client');
+      }
     }
     return created;
+  }
+
+  // ─── Client copy (dual view) ───────────────────────────────────────────────────
+
+  async getArticleClientCopy(versionId: string): Promise<KbClientCopyView> {
+    const version = await this.articleRepository.findByVersionId(versionId);
+    if (!version) throw new NotFoundError('Article', versionId);
+    const copy = await this.articleRepository.getClientCopyByArticleId(version.article_id);
+    if (!copy) throw new NotFoundError('Client copy', versionId);
+    return copy;
+  }
+
+  async saveClientCopy(
+    versionId: string,
+    input: { content?: string; articleName?: string; synopsis?: string },
+    userId: string,
+  ): Promise<KbClientCopyView> {
+    const version = await this.articleRepository.findByVersionId(versionId);
+    if (!version) throw new NotFoundError('Article', versionId);
+
+    const user = await this.userRepository.findUserById(userId);
+    const updatedByName = user ? `${user.first_name} ${user.last_name}` : null;
+
+    const updated = await this.articleRepository.updateClientCopy(
+      version.article_id,
+      { content: input.content, name: input.articleName, synopsis: input.synopsis },
+      userId,
+      updatedByName,
+    );
+    if (!updated) throw new NotFoundError('Client copy', versionId);
+
+    // Re-chunk the client corpus only when the content changed.
+    if (input.content !== undefined) {
+      await this.chunkingService.processVersionSafe(
+        updated.article_id,
+        updated.client_copy_id,
+        input.content,
+        'client',
+      );
+    }
+    return updated;
+  }
+
+  async regenerateClientCopy(versionId: string, userId: string): Promise<KbClientCopyView> {
+    const version = await this.articleRepository.findByVersionId(versionId);
+    if (!version) throw new NotFoundError('Article', versionId);
+
+    const user = await this.userRepository.findUserById(userId);
+    const updatedByName = user ? `${user.first_name} ${user.last_name}` : null;
+
+    const regenerated = await this.articleRepository.regenerateClientCopyFromVersion(
+      version.article_id,
+      versionId,
+      userId,
+      updatedByName,
+    );
+    if (!regenerated) throw new NotFoundError('Article', versionId);
+
+    await this.chunkingService.processVersionSafe(
+      regenerated.article_id,
+      regenerated.client_copy_id,
+      regenerated.content,
+      'client',
+    );
+    return regenerated;
   }
 
   async createVersion(
@@ -478,30 +550,18 @@ export class ArticleService implements IArticleService {
    *  The human-readable author goes in `updated_by_name` (actorName). */
   private static readonly PORTAL_ACTOR_ID = '00000000-0000-4000-8000-000000000001';
 
-  private async resolveOwnedVersion(
+  /** Resolves a client copy by its copy id and asserts it belongs to one of the
+   *  client's topics. Used by portal writes, which address articles by copy id. */
+  private async resolveOwnedClientCopy(
     clientSharedId: string,
-    versionId: string,
-  ): Promise<KbArticleVersionView> {
+    copyId: string,
+  ): Promise<KbClientCopyView> {
     const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
-    const version = await this.articleRepository.findByVersionId(versionId);
-    if (!version || !topicIds.includes(version.topic_id)) {
-      throw new NotFoundError('Article version', versionId);
+    const copy = await this.articleRepository.getClientCopyByCopyId(copyId);
+    if (!copy || !topicIds.includes(copy.topic_id)) {
+      throw new NotFoundError('Article', copyId);
     }
-    return version;
-  }
-
-  private async assertNotLockedForManage(versionId: string): Promise<void> {
-    const lockInfo = await this.articleRepository.getLockInfo(versionId);
-    const now = new Date();
-    if (
-      lockInfo?.locked_by_user_id &&
-      lockInfo.lock_expires_at &&
-      lockInfo.lock_expires_at > now
-    ) {
-      throw new BusinessLogicError(
-        'Article is currently being edited in the intranet. Try again later.',
-      );
-    }
+    return copy;
   }
 
   async createManagedArticle(
@@ -535,6 +595,19 @@ export class ArticleService implements IArticleService {
         created.article_id,
         created.article_version_id,
         data.content,
+        'internal',
+      );
+    }
+
+    // The client copy (seeded on create with the same content) is what the
+    // client actually sees — chunk it for the external search too.
+    const copy = await this.articleRepository.getClientCopyByArticleId(created.article_id);
+    if (copy && copy.content.trim()) {
+      await this.chunkingService.processVersionSafe(
+        copy.article_id,
+        copy.client_copy_id,
+        copy.content,
+        'client',
       );
     }
 
@@ -542,79 +615,52 @@ export class ArticleService implements IArticleService {
     return updated ?? created;
   }
 
+  /** Portal edits target the CLIENT COPY (addressed by its copy id), never the
+   *  internal versions — so internal language can never leak to the client. */
   async updateManagedArticle(
     clientSharedId: string,
-    versionId: string,
+    copyId: string,
     input: UpdateManagedArticleInput,
-  ): Promise<KbArticleVersionView> {
+  ): Promise<KbClientCopyView> {
     const data = UpdateManagedArticleSchema.parse(input);
 
-    const current = await this.resolveOwnedVersion(clientSharedId, versionId);
-    if (current.article_status !== 'published') {
-      throw new BusinessLogicError('Only published articles can be edited from the portal.');
-    }
-    await this.assertNotLockedForManage(versionId);
+    const current = await this.resolveOwnedClientCopy(clientSharedId, copyId);
 
-    // Live edit = new version in the history, published immediately; the
-    // previous version becomes outdated so lists keep a single live version.
-    const newVersion = await this.articleRepository.addVersion(versionId, {
-      useVersionAsTemplate: true,
-      userId: ArticleService.PORTAL_ACTOR_ID,
-      updatedByName: data.actorName,
-    });
+    const updated = await this.articleRepository.updateClientCopy(
+      current.article_id,
+      { content: data.content, name: data.articleName, synopsis: data.synopsis },
+      ArticleService.PORTAL_ACTOR_ID,
+      data.actorName,
+    );
+    if (!updated) throw new NotFoundError('Article', copyId);
 
     if (data.content !== undefined) {
-      await this.articleRepository.updateVersionContent(
-        newVersion.article_version_id,
-        data.content,
-        ArticleService.PORTAL_ACTOR_ID,
-        data.actorName,
-      );
-    }
-    if (data.articleName !== undefined) {
-      await this.articleRepository.updateVersionName(
-        newVersion.article_version_id,
-        data.articleName,
-      );
-    }
-    if (data.synopsis !== undefined) {
-      await this.articleRepository.updateVersionSynopsis(
-        newVersion.article_version_id,
-        data.synopsis,
-      );
-    }
-
-    await this.articleRepository.updateVersionStatus(versionId, 'outdated');
-    await this.articleRepository.updateVersionStatus(newVersion.article_version_id, 'published');
-
-    // Drop chunks of the outdated version; index the new content for search.
-    await this.chunkingService.processVersionSafe(newVersion.article_id, versionId, '');
-    const finalContent = data.content !== undefined ? data.content : newVersion.content;
-    if (finalContent && finalContent.trim()) {
       await this.chunkingService.processVersionSafe(
-        newVersion.article_id,
-        newVersion.article_version_id,
-        finalContent,
+        updated.article_id,
+        updated.client_copy_id,
+        data.content,
+        'client',
       );
     }
-
-    const updated = await this.articleRepository.findByVersionId(newVersion.article_version_id);
-    return updated ?? newVersion;
+    return updated;
   }
 
+  /** Portal "delete" hides the client copy (unpublishes it) and drops its
+   *  search chunks. The internal article is left untouched. */
   async archiveManagedArticle(
     clientSharedId: string,
-    versionId: string,
+    copyId: string,
   ): Promise<{ article_status: string }> {
-    const current = await this.resolveOwnedVersion(clientSharedId, versionId);
-    if (current.article_status !== 'published') {
-      throw new BusinessLogicError('Only published articles can be archived from the portal.');
-    }
-    await this.assertNotLockedForManage(versionId);
+    const current = await this.resolveOwnedClientCopy(clientSharedId, copyId);
 
-    await this.articleRepository.updateVersionStatus(versionId, 'archived');
-    await this.chunkingService.processVersionSafe(current.article_id, versionId, '');
-    return { article_status: 'archived' };
+    await this.articleRepository.setAvailableForClientByArticleId(current.article_id, false);
+    await this.chunkingService.processVersionSafe(
+      current.article_id,
+      current.client_copy_id,
+      '',
+      'client',
+    );
+    return { article_status: 'unavailable' };
   }
 
   async findSharedArticlesByClientSharedId(
@@ -631,17 +677,18 @@ export class ArticleService implements IArticleService {
     // drop articles that are not flagged `available_for_client` for this
     // public endpoint; without the buffer a few admin-only top hits could
     // shrink the returned list below the caller's `limit`.
+    // Client-facing reads source the CLIENT COPY, never internal versions.
     const search = filters.search?.trim();
     if (search) {
       const overFetch = Math.max(filters.limit * 3, 50);
       const hits = await this.searchService.search(search, {
         topicIds,
-        statuses: ['published'],
+        audience: 'client',
         limit: overFetch,
       });
       const visible = hits.filter((h) => h.article.available_for_client === true);
       return visible.slice(0, filters.limit).map((h) => ({
-        article_id: h.article.article_version_id,
+        article_id: h.article.article_version_id, // = client_copy_id
         article_name: h.article.article_name,
         article_synopsis: h.article.article_synopsis,
         updated_at: h.article.updatedAt,
@@ -649,34 +696,34 @@ export class ArticleService implements IArticleService {
       }));
     }
 
-    const views = await this.articleRepository.findPublishedByTopicIds(topicIds, filters);
+    const copies = await this.articleRepository.findClientFacingByTopicIds(topicIds);
 
-    return views.map((v) => ({
-      article_id: v.article_version_id,
-      article_name: v.article_name,
-      article_synopsis: v.article_synopsis,
-      updated_at: v.updatedAt,
+    return copies.map((c) => ({
+      article_id: c.client_copy_id,
+      article_name: c.article_name,
+      article_synopsis: c.article_synopsis,
+      updated_at: c.updatedAt,
     }));
   }
 
   async getArticleByExternalClientAndArticleId(
     clientSharedId: string,
-    versionId: string,
+    copyId: string,
   ): Promise<ExternalClientArticleDetail> {
     const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
     if (topicIds.length === 0) throw new NotFoundError('Client', clientSharedId);
 
-    const view = await this.articleRepository.findPublishedVersionByTopicIds(topicIds, versionId);
-    if (!view) throw new NotFoundError('Article', versionId);
+    const copy = await this.articleRepository.findClientFacingByCopyId(topicIds, copyId);
+    if (!copy) throw new NotFoundError('Article', copyId);
 
     return {
       article: {
-        article_id: view.article_version_id,
-        article_name: view.article_name,
-        article_synopsis: view.article_synopsis,
-        updated_at: view.updatedAt,
+        article_id: copy.client_copy_id,
+        article_name: copy.article_name,
+        article_synopsis: copy.article_synopsis,
+        updated_at: copy.updatedAt,
       },
-      content: view.content,
+      content: copy.content,
     };
   }
 
@@ -690,13 +737,14 @@ export class ArticleService implements IArticleService {
     const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, topicId);
     if (topicIds.length === 0) return [];
 
+    // Admin variant still sources the client copy (the portal never shows
+    // internal content), but ignores `available_for_client` so BPO admins can
+    // see/edit copies before they are published to the client.
     const search = filters.search?.trim();
     if (search) {
-      // Admin variant: no post-filter on `available_for_client`, so we can
-      // ask the search service for exactly `limit` hits.
       const hits = await this.searchService.search(search, {
         topicIds,
-        statuses: ['published'],
+        audience: 'client',
         limit: filters.limit,
       });
       return hits.map((h) => ({
@@ -708,42 +756,34 @@ export class ArticleService implements IArticleService {
       }));
     }
 
-    const views = await this.articleRepository.findPublishedByTopicIds(
-      topicIds,
-      filters,
-      true,
-    );
+    const copies = await this.articleRepository.findClientFacingByTopicIds(topicIds, true);
 
-    return views.map((v) => ({
-      article_id: v.article_version_id,
-      article_name: v.article_name,
-      article_synopsis: v.article_synopsis,
-      updated_at: v.updatedAt,
+    return copies.map((c) => ({
+      article_id: c.client_copy_id,
+      article_name: c.article_name,
+      article_synopsis: c.article_synopsis,
+      updated_at: c.updatedAt,
     }));
   }
 
   async getArticleByExternalClientAndArticleIdAdmin(
     clientSharedId: string,
-    versionId: string,
+    copyId: string,
   ): Promise<ExternalClientArticleDetail> {
     const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
     if (topicIds.length === 0) throw new NotFoundError('Client', clientSharedId);
 
-    const view = await this.articleRepository.findPublishedVersionByTopicIds(
-      topicIds,
-      versionId,
-      true,
-    );
-    if (!view) throw new NotFoundError('Article', versionId);
+    const copy = await this.articleRepository.findClientFacingByCopyId(topicIds, copyId, true);
+    if (!copy) throw new NotFoundError('Article', copyId);
 
     return {
       article: {
-        article_id: view.article_version_id,
-        article_name: view.article_name,
-        article_synopsis: view.article_synopsis,
-        updated_at: view.updatedAt,
+        article_id: copy.client_copy_id,
+        article_name: copy.article_name,
+        article_synopsis: copy.article_synopsis,
+        updated_at: copy.updatedAt,
       },
-      content: view.content,
+      content: copy.content,
     };
   }
 
@@ -778,11 +818,33 @@ export class ArticleService implements IArticleService {
           v.article_id,
           v.version_id,
           v.content,
+          'internal',
         );
         processed++;
       } catch {
         // chunkingService logs its own error; just count and move on so one
         // bad article doesn't abort the rest of the backfill.
+        failed++;
+      }
+    }
+
+    // Also (re)index the client copies so the external/portal search works,
+    // including copies seeded by the dual-view backfill.
+    const copies = await this.articleRepository.findAllClientCopiesForChunking(topicIds);
+    for (const c of copies) {
+      if (!c.content || !c.content.trim()) {
+        skipped++;
+        continue;
+      }
+      try {
+        await this.chunkingService.processVersion(
+          c.article_id,
+          c.copy_id,
+          c.content,
+          'client',
+        );
+        processed++;
+      } catch {
         failed++;
       }
     }

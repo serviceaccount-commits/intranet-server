@@ -260,6 +260,65 @@ export class ArticleController {
     }
   }
 
+  async getArticleClientCopy(req: Request, res: Response) {
+    const { articleId } = req.params;
+    const userId = req.user?.id;
+    if (!articleId || !userId) {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      const copy = await this.articleService.getArticleClientCopy(articleId);
+      res.json(copy);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+      res.status(400).json({ error });
+    }
+  }
+
+  async saveArticleClientCopy(req: Request, res: Response) {
+    const { articleId } = req.params;
+    const userId = req.user?.id;
+    if (!articleId || !userId) {
+      res.sendStatus(400);
+      return;
+    }
+    const { content, articleName, synopsis } = req.body;
+    try {
+      const copy = await this.articleService.saveClientCopy(
+        articleId,
+        { content, articleName, synopsis },
+        userId,
+      );
+      res.json(copy);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+      res.status(400).json({ error });
+    }
+  }
+
+  async regenerateArticleClientCopy(req: Request, res: Response) {
+    const { articleId } = req.params;
+    const userId = req.user?.id;
+    if (!articleId || !userId) {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      const copy = await this.articleService.regenerateClientCopy(articleId, userId);
+      res.json(copy);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+      res.status(400).json({ error });
+    }
+  }
+
   async unpublishVersion(req: Request, res: Response) {
     const { articleId } = req.params;
     const userId = req.user?.id;

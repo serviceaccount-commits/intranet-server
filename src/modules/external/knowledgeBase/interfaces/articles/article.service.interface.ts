@@ -1,5 +1,6 @@
 import {
   KbArticleVersionView,
+  KbClientCopyView,
   PaginatedArticlesResult,
   ArticleLockInfo,
   KbTag,
@@ -128,6 +129,18 @@ export interface IArticleService {
     available: boolean,
   ): Promise<{ available_for_client: boolean }>;
 
+  // ── Client copy (dual view) ────────────────────────────────────────────────
+  /** The client-facing copy of the article that contains `versionId`. */
+  getArticleClientCopy(versionId: string): Promise<KbClientCopyView>;
+  /** Overwrites the client copy (independent of internal versions) + re-chunks. */
+  saveClientCopy(
+    versionId: string,
+    input: { content?: string; articleName?: string; synopsis?: string },
+    userId: string,
+  ): Promise<KbClientCopyView>;
+  /** Regenerates the client copy from the internal version `versionId`. */
+  regenerateClientCopy(versionId: string, userId: string): Promise<KbClientCopyView>;
+
   // ── External client ──────────────────────────────────────────────────────────
   findSharedArticlesByClientSharedId(
     filters: FilterArticleInput,
@@ -151,12 +164,12 @@ export interface IArticleService {
   ): Promise<KbArticleVersionView>;
   updateManagedArticle(
     clientSharedId: string,
-    versionId: string,
+    copyId: string,
     input: UpdateManagedArticleInput,
-  ): Promise<KbArticleVersionView>;
+  ): Promise<KbClientCopyView>;
   archiveManagedArticle(
     clientSharedId: string,
-    versionId: string,
+    copyId: string,
   ): Promise<{ article_status: string }>;
 
   // ── Admin (ignores available_for_client flag) ────────────────────────────────
