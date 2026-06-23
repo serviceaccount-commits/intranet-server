@@ -54,6 +54,7 @@ export const generateArticleSynopsis = async (
          - **Sentence 2 (The Solution):** Summarize the specific procedure, script, or answer contained in the article.
       2. **Tone:** Professional, direct, and utility-focused. No marketing fluff. No rhetorical questions.
       3. **Constraint:** Do not speak to the customer ("You will find..."). Speak to the Agent ("This guide explains...").
+      4. **Language:** Write the synopsis in the SAME language as the article content below (e.g. Spanish article → Spanish synopsis, English article → English synopsis). Detect it from the content; do not translate.
 
       **Article Content:**
       \n\n${articleContent}`;
