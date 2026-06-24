@@ -3,6 +3,7 @@ import {
   KbClientCopyView,
   PaginatedArticlesResult,
   ArticleLockInfo,
+  ArticleProperty,
   KbTag,
   KbTopic,
 } from '../../database/kb-domain.types';
@@ -19,6 +20,8 @@ export interface ExternalClientArticle {
   article_name: string;
   article_synopsis: string;
   updated_at: Date;
+  /** Ownership classification shown as a column in the portal list. */
+  article_property: ArticleProperty;
   /** Relevance score from the hybrid search service. Present only on
    *  search responses; consumers can sort by this descending. */
   _score?: number;
@@ -109,6 +112,7 @@ export interface IArticleService {
     };
     available_for_client: boolean;
     available_for_ai: boolean;
+    article_property: ArticleProperty;
   }>;
   getArticleDocumentById(versionId: string): Promise<string>;
 
@@ -136,6 +140,13 @@ export interface IArticleService {
     versionId: string,
     available: boolean,
   ): Promise<{ available_for_ai: boolean }>;
+
+  /** Persists the ownership/property classification (staff-assigned in the
+   *  intranet; shown as a column in the intranet + portal lists). */
+  setArticleProperty(
+    versionId: string,
+    property: ArticleProperty,
+  ): Promise<{ article_property: ArticleProperty }>;
 
   // ── Client copy (dual view) ────────────────────────────────────────────────
   /** The client-facing copy of the article that contains `versionId`. */

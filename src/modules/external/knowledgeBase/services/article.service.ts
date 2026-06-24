@@ -17,6 +17,7 @@ import {
   KbClientCopyView,
   PaginatedArticlesResult,
   ArticleLockInfo,
+  ArticleProperty,
   KbTag,
   KbTopic,
 } from '../database/kb-domain.types';
@@ -383,6 +384,7 @@ export class ArticleService implements IArticleService {
     };
     available_for_client: boolean;
     available_for_ai: boolean;
+    article_property: ArticleProperty;
   }> {
     const view = await this.articleRepository.findByVersionId(versionId);
     if (!view) throw new NotFoundError('Article', versionId);
@@ -421,6 +423,7 @@ export class ArticleService implements IArticleService {
       },
       available_for_client: view.available_for_client,
       available_for_ai: view.available_for_ai ?? false,
+      article_property: view.article_property ?? 'paricus',
     };
   }
 
@@ -501,6 +504,17 @@ export class ArticleService implements IArticleService {
 
     await this.articleRepository.setAvailableForAi(versionId, available);
     return { available_for_ai: available };
+  }
+
+  async setArticleProperty(
+    versionId: string,
+    property: ArticleProperty,
+  ): Promise<{ article_property: ArticleProperty }> {
+    const article = await this.articleRepository.findByVersionId(versionId);
+    if (!article) throw new NotFoundError('Article version', versionId);
+
+    await this.articleRepository.setArticleProperty(versionId, property);
+    return { article_property: property };
   }
 
   async publishVersions(versionIds: string[]): Promise<void> {
@@ -602,6 +616,12 @@ export class ArticleService implements IArticleService {
     }
     await this.articleRepository.updateVersionStatus(created.article_version_id, 'published');
     await this.articleRepository.setAvailableForClient(created.article_version_id, true);
+    // Articles created by the client from the portal are, by definition, their
+    // own creation. Set server-side so it cannot be spoofed via the write API.
+    await this.articleRepository.setArticleProperty(
+      created.article_version_id,
+      'client_self_created',
+    );
 
     if (data.content && data.content.trim()) {
       await this.chunkingService.processVersionSafe(
@@ -705,6 +725,7 @@ export class ArticleService implements IArticleService {
         article_name: h.article.article_name,
         article_synopsis: h.article.article_synopsis,
         updated_at: h.article.updatedAt,
+        article_property: h.article.article_property,
         _score: h.score,
       }));
     }
@@ -716,6 +737,7 @@ export class ArticleService implements IArticleService {
       article_name: c.article_name,
       article_synopsis: c.article_synopsis,
       updated_at: c.updatedAt,
+      article_property: c.article_property,
     }));
   }
 
@@ -735,6 +757,7 @@ export class ArticleService implements IArticleService {
         article_name: copy.article_name,
         article_synopsis: copy.article_synopsis,
         updated_at: copy.updatedAt,
+        article_property: copy.article_property,
       },
       content: copy.content,
     };
@@ -765,6 +788,7 @@ export class ArticleService implements IArticleService {
         article_name: h.article.article_name,
         article_synopsis: h.article.article_synopsis,
         updated_at: h.article.updatedAt,
+        article_property: h.article.article_property,
         _score: h.score,
       }));
     }
@@ -776,6 +800,7 @@ export class ArticleService implements IArticleService {
       article_name: c.article_name,
       article_synopsis: c.article_synopsis,
       updated_at: c.updatedAt,
+      article_property: c.article_property,
     }));
   }
 
@@ -795,6 +820,7 @@ export class ArticleService implements IArticleService {
         article_name: copy.article_name,
         article_synopsis: copy.article_synopsis,
         updated_at: copy.updatedAt,
+        article_property: copy.article_property,
       },
       content: copy.content,
     };

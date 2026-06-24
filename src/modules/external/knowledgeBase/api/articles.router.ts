@@ -192,6 +192,17 @@ articlesRouter.put(
   },
 );
 
+articlesRouter.put(
+  '/:articleId/property',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await articleController.updateArticleProperty(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 // ── Client copy (dual view): keyed by the current internal version id ─────────
 articlesRouter.get(
   '/:articleId/client-copy',

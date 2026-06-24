@@ -14,6 +14,7 @@ import {
   PaginatedArticlesResult,
   ArticleLockInfo,
   ArticleStatus,
+  ArticleProperty,
 } from '../database/kb-domain.types';
 import { getArticlesCollection } from '../database/kb-collections';
 import { getMongoDb } from '../../../../shared/database/mongo-connection';
@@ -43,6 +44,7 @@ export class ArticleRepository implements IArticleRepository {
       lock_expires_at: article.lock_expires_at,
       available_for_client: article.available_for_client,
       available_for_ai: article.available_for_ai ?? false,
+      article_property: article.article_property ?? 'paricus',
       article_version_id: version._id.toString(),
       article_name: version.article_name,
       article_synopsis: version.article_synopsis,
@@ -84,6 +86,7 @@ export class ArticleRepository implements IArticleRepository {
           'versions.lock_expires_at': '$lock_expires_at',
           'versions.available_for_client': '$available_for_client',
           'versions.available_for_ai': '$available_for_ai',
+          'versions.article_property': '$article_property',
         },
       },
       { $match: { 'versions.article_status': { $in: allowedStatuses } } },
@@ -111,6 +114,7 @@ export class ArticleRepository implements IArticleRepository {
       article_id: article._id.toString(),
       topic_id: article.topic_id,
       available_for_client: article.available_for_client,
+      article_property: article.article_property ?? 'paricus',
       client_copy_id: copy._id.toString(),
       article_name: copy.article_name,
       article_synopsis: copy.article_synopsis,
@@ -136,6 +140,7 @@ export class ArticleRepository implements IArticleRepository {
       lock_expires_at: (v['lock_expires_at'] as Date | null) ?? null,
       available_for_client: v['available_for_client'] as boolean,
       available_for_ai: (v['available_for_ai'] as boolean) ?? false,
+      article_property: (v['article_property'] as ArticleProperty) ?? 'paricus',
       article_version_id: (v['_id'] as ObjectId).toString(),
       article_name: v['article_name'] as string,
       article_synopsis: v['article_synopsis'] as string,
@@ -210,6 +215,7 @@ export class ArticleRepository implements IArticleRepository {
       lock_expires_at: null,
       available_for_client: false,
       available_for_ai: false,
+      article_property: 'paricus',
       versions: [firstVersion],
       client_copy: clientCopy,
       createdAt: now,
@@ -553,6 +559,25 @@ export class ArticleRepository implements IArticleRepository {
       { 'versions._id': new ObjectId(versionId) },
       { $set: { available_for_ai: available, updatedAt: new Date() } },
     );
+  }
+
+  async setArticleProperty(versionId: string, property: ArticleProperty): Promise<void> {
+    if (!ObjectId.isValid(versionId)) throw new NotFoundError('Version', versionId);
+    // Root-level article field (not per-version), so no positional operator.
+    await this.col.updateOne(
+      { 'versions._id': new ObjectId(versionId) },
+      { $set: { article_property: property, updatedAt: new Date() } },
+    );
+  }
+
+  /** One-time idempotent backfill: stamps 'paricus' on any legacy doc missing
+   *  the ownership field. Safe to run on every boot ($exists:false filter). */
+  async backfillArticleProperty(): Promise<number> {
+    const result = await this.col.updateMany(
+      { article_property: { $exists: false } },
+      { $set: { article_property: 'paricus' } },
+    );
+    return result.modifiedCount;
   }
 
   // ─── Edit locks ───────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import { AppError } from '../../../../shared/errors/AppError';
 import { MoveArticleInput } from '../schema/clients/MoveArticleSchema';
 import { CreateVersionInput } from '../schema/articles/CreateVersionSchema';
 import { ArticleSearchService } from '../services/articleSearch.service';
-import { ArticleStatus } from '../database/kb-domain.types';
+import { ArticleStatus, ArticlePropertyEnum } from '../database/kb-domain.types';
 
 @injectable()
 export class ArticleController {
@@ -272,6 +272,27 @@ export class ArticleController {
 
     try {
       const result = await this.articleService.setArticleAiAvailability(articleId, available);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof BusinessLogicError) {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(400).json({ error });
+    }
+  }
+
+  async updateArticleProperty(req: Request, res: Response) {
+    const { articleId } = req.params;
+    const userId = req.user?.id;
+    const parsed = ArticlePropertyEnum.safeParse(req.body?.property);
+
+    if (!articleId || !userId || !parsed.success) {
+      res.sendStatus(400);
+      return;
+    }
+
+    try {
+      const result = await this.articleService.setArticleProperty(articleId, parsed.data);
       res.json(result);
     } catch (error) {
       if (error instanceof BusinessLogicError) {

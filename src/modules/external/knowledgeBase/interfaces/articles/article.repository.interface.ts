@@ -4,6 +4,7 @@ import {
   PaginatedArticlesResult,
   ArticleLockInfo,
   ArticleStatus,
+  ArticleProperty,
 } from '../../database/kb-domain.types';
 import { FilterArticleInput } from '../../schema/articles/FilterArticleSchema';
 
@@ -95,6 +96,9 @@ export interface IArticleRepository {
   /** Sets the root-level available_for_ai flag on the article containing versionId. */
   setAvailableForAi(versionId: string, available: boolean): Promise<void>;
 
+  /** Sets the root-level article_property classification on the article containing versionId. */
+  setArticleProperty(versionId: string, property: ArticleProperty): Promise<void>;
+
   // ── Edit locks ───────────────────────────────────────────────────────────────
 
   acquireLock(versionId: string, userId: string, expiresAt: Date): Promise<void>;
@@ -115,6 +119,10 @@ export interface IArticleRepository {
   // ── Maintenance ──────────────────────────────────────────────────────────────
 
   clearExpiredLocks(): Promise<number>;
+
+  /** Idempotent backfill: stamps 'paricus' on legacy docs missing article_property.
+   *  Returns the number of documents updated. */
+  backfillArticleProperty(): Promise<number>;
 
   // ── External client portal ───────────────────────────────────────────────────
 

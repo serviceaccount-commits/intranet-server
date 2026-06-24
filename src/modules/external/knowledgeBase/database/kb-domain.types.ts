@@ -19,6 +19,21 @@ export type ArticleStatus = z.infer<typeof ArticleStatusEnum>;
 export const ChunkAudienceEnum = z.enum(['internal', 'client']);
 export type ChunkAudience = z.infer<typeof ChunkAudienceEnum>;
 
+// Ownership/property classification of an article (staff-assigned in the
+// intranet, shown as a column in the intranet + client portal lists):
+//  - 'paricus'             → generic Paricus content (default for legacy + new
+//                            intranet-created articles).
+//  - 'client_owned'        → Paricus created it on behalf of the client whose KB
+//                            it lives in.
+//  - 'client_self_created' → the client created it themselves from the portal
+//                            (auto-assigned server-side on managed create).
+export const ArticlePropertyEnum = z.enum([
+  'paricus',
+  'client_owned',
+  'client_self_created',
+]);
+export type ArticleProperty = z.infer<typeof ArticlePropertyEnum>;
+
 // ─── Tag ─────────────────────────────────────────────────────────────────────
 
 export const KbTagSchema = z.object({
@@ -126,6 +141,9 @@ export const KbArticleSchema = z.object({
   // effect on any current behavior — persisted only. Defaults false for docs
   // created before this flag existed.
   available_for_ai: z.boolean().default(false),
+  // Ownership classification. Defaults to 'paricus' for docs created before this
+  // field existed (legacy backfill) and for new intranet-created articles.
+  article_property: ArticlePropertyEnum.default('paricus'),
   // Embedded versions array — all INTERNAL versions live here
   versions: z.array(KbArticleVersionSchema),
   // The single client-facing copy (seeded on create, edited independently).
@@ -187,6 +205,7 @@ export interface KbArticleVersionView {
   lock_expires_at: Date | null;
   available_for_client: boolean;
   available_for_ai: boolean;
+  article_property: ArticleProperty;
   // Version fields
   article_version_id: string;
   article_name: string;
@@ -214,6 +233,7 @@ export interface KbClientCopyView {
   article_id: string;
   topic_id: string;
   available_for_client: boolean;
+  article_property: ArticleProperty;
   client_copy_id: string;
   article_name: string;
   article_synopsis: string;

@@ -32,6 +32,21 @@ export async function setupKbCollections(db: Db): Promise<void> {
     setupArticleChunkIndexes(db),
   ]);
 
+  await backfillArticleProperty(db);
+}
+
+// ─── One-time data backfills ──────────────────────────────────────────────────
+
+/** Stamps the default ownership classification ('paricus') on any legacy
+ *  article document created before `article_property` existed. Idempotent
+ *  (only touches docs where the field is absent), so it is safe to run on
+ *  every boot. */
+async function backfillArticleProperty(db: Db): Promise<void> {
+  const col = getArticlesCollection(db);
+  await col.updateMany(
+    { article_property: { $exists: false } },
+    { $set: { article_property: 'paricus' } },
+  );
 }
 
 // ─── Tag indexes ──────────────────────────────────────────────────────────────
