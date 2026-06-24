@@ -108,6 +108,7 @@ export interface IArticleService {
       article: { article_id: string; topic: { topic_id: string; topic_name: string; client_id: string }; user_id: string | null };
     };
     available_for_client: boolean;
+    available_for_ai: boolean;
   }>;
   getArticleDocumentById(versionId: string): Promise<string>;
 
@@ -128,6 +129,13 @@ export interface IArticleService {
     versionId: string,
     available: boolean,
   ): Promise<{ available_for_client: boolean }>;
+
+  /** Persists the "available for AI" flag (marks the article for future
+   *  chatbot/AI consumption). Has no effect on any current behavior. */
+  setArticleAiAvailability(
+    versionId: string,
+    available: boolean,
+  ): Promise<{ available_for_ai: boolean }>;
 
   // ── Client copy (dual view) ────────────────────────────────────────────────
   /** The client-facing copy of the article that contains `versionId`. */

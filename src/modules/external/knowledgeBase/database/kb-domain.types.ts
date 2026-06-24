@@ -122,6 +122,10 @@ export const KbArticleSchema = z.object({
   lock_expires_at: z.date().nullable(),
   // External client visibility — now governs the client copy's exposure
   available_for_client: z.boolean(),
+  // Marks the article as available for future chatbot/AI consumption. Has no
+  // effect on any current behavior — persisted only. Defaults false for docs
+  // created before this flag existed.
+  available_for_ai: z.boolean().default(false),
   // Embedded versions array — all INTERNAL versions live here
   versions: z.array(KbArticleVersionSchema),
   // The single client-facing copy (seeded on create, edited independently).
@@ -182,6 +186,7 @@ export interface KbArticleVersionView {
   locked_by_user_id: string | null;
   lock_expires_at: Date | null;
   available_for_client: boolean;
+  available_for_ai: boolean;
   // Version fields
   article_version_id: string;
   article_name: string;

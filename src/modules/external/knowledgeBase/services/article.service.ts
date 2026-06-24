@@ -382,6 +382,7 @@ export class ArticleService implements IArticleService {
       article: { article_id: string; topic: { topic_id: string; topic_name: string; client_id: string }; user_id: string | null };
     };
     available_for_client: boolean;
+    available_for_ai: boolean;
   }> {
     const view = await this.articleRepository.findByVersionId(versionId);
     if (!view) throw new NotFoundError('Article', versionId);
@@ -419,6 +420,7 @@ export class ArticleService implements IArticleService {
         },
       },
       available_for_client: view.available_for_client,
+      available_for_ai: view.available_for_ai ?? false,
     };
   }
 
@@ -488,6 +490,17 @@ export class ArticleService implements IArticleService {
 
     await this.articleRepository.setAvailableForClient(versionId, available);
     return { available_for_client: available };
+  }
+
+  async setArticleAiAvailability(
+    versionId: string,
+    available: boolean,
+  ): Promise<{ available_for_ai: boolean }> {
+    const article = await this.articleRepository.findByVersionId(versionId);
+    if (!article) throw new NotFoundError('Article version', versionId);
+
+    await this.articleRepository.setAvailableForAi(versionId, available);
+    return { available_for_ai: available };
   }
 
   async publishVersions(versionIds: string[]): Promise<void> {

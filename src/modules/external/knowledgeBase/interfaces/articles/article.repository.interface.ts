@@ -92,6 +92,9 @@ export interface IArticleRepository {
    *  caller only has the client copy id, e.g. portal writes). */
   setAvailableForClientByArticleId(articleId: string, available: boolean): Promise<void>;
 
+  /** Sets the root-level available_for_ai flag on the article containing versionId. */
+  setAvailableForAi(versionId: string, available: boolean): Promise<void>;
+
   // ── Edit locks ───────────────────────────────────────────────────────────────
 
   acquireLock(versionId: string, userId: string, expiresAt: Date): Promise<void>;

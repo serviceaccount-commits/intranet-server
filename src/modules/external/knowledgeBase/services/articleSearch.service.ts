@@ -41,6 +41,7 @@ function clientCopyToHitView(c: KbClientCopyView): KbArticleVersionView {
     locked_by_user_id: null,
     lock_expires_at: null,
     available_for_client: c.available_for_client,
+    available_for_ai: false,
     article_version_id: c.client_copy_id,
     article_name: c.article_name,
     article_synopsis: c.article_synopsis,

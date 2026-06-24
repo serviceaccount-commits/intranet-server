@@ -42,6 +42,7 @@ export class ArticleRepository implements IArticleRepository {
       locked_by_user_id: article.locked_by_user_id,
       lock_expires_at: article.lock_expires_at,
       available_for_client: article.available_for_client,
+      available_for_ai: article.available_for_ai ?? false,
       article_version_id: version._id.toString(),
       article_name: version.article_name,
       article_synopsis: version.article_synopsis,
@@ -82,6 +83,7 @@ export class ArticleRepository implements IArticleRepository {
           'versions.locked_by_user_id': '$locked_by_user_id',
           'versions.lock_expires_at': '$lock_expires_at',
           'versions.available_for_client': '$available_for_client',
+          'versions.available_for_ai': '$available_for_ai',
         },
       },
       { $match: { 'versions.article_status': { $in: allowedStatuses } } },
@@ -133,6 +135,7 @@ export class ArticleRepository implements IArticleRepository {
       locked_by_user_id: (v['locked_by_user_id'] as string | null) ?? null,
       lock_expires_at: (v['lock_expires_at'] as Date | null) ?? null,
       available_for_client: v['available_for_client'] as boolean,
+      available_for_ai: (v['available_for_ai'] as boolean) ?? false,
       article_version_id: (v['_id'] as ObjectId).toString(),
       article_name: v['article_name'] as string,
       article_synopsis: v['article_synopsis'] as string,
@@ -206,6 +209,7 @@ export class ArticleRepository implements IArticleRepository {
       locked_by_user_id: null,
       lock_expires_at: null,
       available_for_client: false,
+      available_for_ai: false,
       versions: [firstVersion],
       client_copy: clientCopy,
       createdAt: now,
@@ -539,6 +543,15 @@ export class ArticleRepository implements IArticleRepository {
     await this.col.updateOne(
       { _id: new ObjectId(articleId) },
       { $set: { available_for_client: available, updatedAt: new Date() } },
+    );
+  }
+
+  async setAvailableForAi(versionId: string, available: boolean): Promise<void> {
+    if (!ObjectId.isValid(versionId)) throw new NotFoundError('Version', versionId);
+    // Root-level article field (not per-version), so no positional operator.
+    await this.col.updateOne(
+      { 'versions._id': new ObjectId(versionId) },
+      { $set: { available_for_ai: available, updatedAt: new Date() } },
     );
   }
 

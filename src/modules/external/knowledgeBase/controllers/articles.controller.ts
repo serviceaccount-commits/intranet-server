@@ -260,6 +260,27 @@ export class ArticleController {
     }
   }
 
+  async updateArticleAiAvailability(req: Request, res: Response) {
+    const { articleId } = req.params;
+    const userId = req.user?.id;
+    const { available } = req.body;
+
+    if (!articleId || !userId || typeof available !== 'boolean') {
+      res.sendStatus(400);
+      return;
+    }
+
+    try {
+      const result = await this.articleService.setArticleAiAvailability(articleId, available);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof BusinessLogicError) {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(400).json({ error });
+    }
+  }
+
   async getArticleClientCopy(req: Request, res: Response) {
     const { articleId } = req.params;
     const userId = req.user?.id;
