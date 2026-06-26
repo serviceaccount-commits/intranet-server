@@ -9,6 +9,7 @@ import { configurePassport } from './shared/config/passport.config';
 import passport from 'passport';
 
 const app = express();
+app.disable('x-powered-by'); // no revelar el stack (Express) en las respuestas
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.text({ limit: '25mb' }));
