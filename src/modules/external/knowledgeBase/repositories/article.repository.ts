@@ -18,7 +18,7 @@ import {
 } from '../database/kb-domain.types';
 import { getArticlesCollection } from '../database/kb-collections';
 import { getMongoDb } from '../../../../shared/database/mongo-connection';
-import { FilterArticleInput } from '../schema/articles/FilterArticleSchema';
+import { FilterArticleInput, ArticleSortField } from '../schema/articles/FilterArticleSchema';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
 
 @injectable()
@@ -405,6 +405,24 @@ export class ArticleRepository implements IArticleRepository {
     return this.paginateVersionPipeline(matchStages, filters, canSeeDraft, page, limit);
   }
 
+  /** Maps an allowed sort field to its path on the unwound version doc. */
+  private buildVersionSort(filters: FilterArticleInput): Record<string, 1 | -1> {
+    // Default keeps the historical behaviour: most recently updated first.
+    const fieldMap: Record<ArticleSortField, string> = {
+      article_name: 'versions.article_name',
+      updated_by_name: 'versions.updated_by_name',
+      updatedAt: 'versions.updatedAt',
+      article_property: 'versions.article_property',
+      article_status: 'versions.article_status',
+    };
+    const path: string = filters.sortBy ? fieldMap[filters.sortBy] : 'versions.updatedAt';
+    const dir: 1 | -1 = filters.sortDir === 'asc' ? 1 : -1;
+    // Tiebreaker on updatedAt keeps paging stable when the sort key has ties.
+    return path === 'versions.updatedAt'
+      ? { [path]: dir }
+      : { [path]: dir, 'versions.updatedAt': -1 };
+  }
+
   /** Shared pagination helper for all findAndCount* methods. */
   private async paginateVersionPipeline(
     preMatchStages: Record<string, unknown>[],
@@ -416,6 +434,7 @@ export class ArticleRepository implements IArticleRepository {
     const filterStages = this.buildVersionFilterStages(filters, canSeeDraft);
     const basePipeline = [...preMatchStages, ...filterStages];
     const skip = (page - 1) * limit;
+    const sortStage = this.buildVersionSort(filters);
 
     const [countResult, docs] = await Promise.all([
       this.col
@@ -424,7 +443,7 @@ export class ArticleRepository implements IArticleRepository {
       this.col
         .aggregate([
           ...basePipeline,
-          { $sort: { 'versions.updatedAt': -1 } },
+          { $sort: sortStage },
           { $skip: skip },
           { $limit: limit },
           { $project: { 'versions.content': 0 } }, // exclude content from list view
