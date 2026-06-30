@@ -48,6 +48,11 @@ const stripMarkdown = (text: string): string =>
     .replace(/__/g, '') // bold markers __...__
     .replace(/`+/g, '') // inline code backticks
     .replace(/^\s*[*_#>•-]+\s*/gm, '') // leading bullets / headings / blockquote per line
+    // The model sometimes prefixes a label line ("**Synopsis:**", "Sinopsis:",
+    // "Resumen:", "Summary:") before the actual two sentences — drop it. The
+    // real synopsis always starts with "Use this guide when…" / "Usa esta guía
+    // cuando…", so this never eats genuine content.
+    .replace(/^\s*(synopsis|sinopsis|resumen|summary)\s*:?\s*/i, '')
     .trim();
 
 export const generateArticleSynopsis = async (
