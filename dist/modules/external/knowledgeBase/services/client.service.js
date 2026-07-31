@@ -59,7 +59,7 @@ let ClientService = class ClientService {
             }
         }
         const clientSharedId = `PA_${region.toUpperCase()}_${sharedIdSuffix}`;
-        return this.clientRepository.create({
+        const client = await this.clientRepository.create({
             client_name: data.clientName,
             client_shared_id: clientSharedId,
             region,
@@ -73,6 +73,10 @@ let ClientService = class ClientService {
             primary_contact_phone: data.primaryContactPhone ?? null,
             user_id: userId,
         });
+        // The KB tree only lists clients present in the user_clients access
+        // table — grant the creator access so the new client is visible to them.
+        await this.clientRepository.addUserAccess(client.client_id, userId);
+        return client;
     }
     async updateClient(input) {
         const client = await this.clientRepository.findById(input.clientId);

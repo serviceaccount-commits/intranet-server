@@ -19,6 +19,35 @@ const kb_collections_1 = require("../database/kb-collections");
 const mongo_connection_1 = require("../../../../shared/database/mongo-connection");
 const ai_service_1 = require("../../../../shared/utils/ai.service");
 const logger_1 = require("../../../../shared/utils/logger");
+/** Adapts a client-copy view to the flat version-view shape the search hit and
+ *  its consumers expect (article id = the client copy id). */
+function clientCopyToHitView(c) {
+    return {
+        article_id: c.article_id,
+        topic_id: c.topic_id,
+        user_id: null,
+        locked_by_user_id: null,
+        lock_expires_at: null,
+        available_for_client: c.available_for_client,
+        available_for_ai: false,
+        article_property: c.article_property,
+        article_version_id: c.client_copy_id,
+        article_name: c.article_name,
+        article_synopsis: c.article_synopsis,
+        article_status: 'published',
+        version: 1,
+        content: c.content,
+        content_storage: 'inline',
+        tag_ids: [],
+        created_by: null,
+        updated_by: c.updated_by,
+        updated_by_name: c.updated_by_name,
+        published_by: null,
+        published_at: null,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+    };
+}
 const RRF_K = 60;
 const DEFAULT_LIMIT = 20;
 const VECTOR_TOP_K = 50;
@@ -53,15 +82,41 @@ let ArticleSearchService = class ArticleSearchService {
             return [];
         const limit = options.limit ?? DEFAULT_LIMIT;
         const allowedStatuses = options.statuses ?? ['published'];
+        const audience = options.audience ?? 'internal';
         const [vectorRanking, textRanking] = await Promise.all([
-            this.vectorSearch(trimmed),
-            this.textSearch(trimmed),
+            this.vectorSearch(trimmed, audience),
+            // Text search runs over the articles collection's $text index, which
+            // covers internal version content only. The client corpus is searched
+            // by vectors alone.
+            audience === 'internal' ? this.textSearch(trimmed) : Promise.resolve([]),
         ]);
         const fused = this.fuseRankings(vectorRanking, textRanking);
         if (fused.length === 0)
             return [];
-        const versionIds = fused.map((f) => f.version_id);
-        const articles = await this.articleRepository.findByVersionIds(versionIds);
+        const ids = fused.map((f) => f.version_id);
+        if (audience === 'client') {
+            const copies = await this.articleRepository.findClientCopyViewsByCopyIds(ids);
+            const byId = new Map(copies.map((c) => [c.client_copy_id, c]));
+            const hits = [];
+            for (const f of fused) {
+                const copy = byId.get(f.version_id);
+                if (!copy)
+                    continue;
+                if (options.topicIds && options.topicIds.length > 0 && !options.topicIds.includes(copy.topic_id))
+                    continue;
+                hits.push({
+                    article: clientCopyToHitView(copy),
+                    matched_chunk_preview: f.preview,
+                    score: f.score,
+                    vector_rank: f.vector_rank,
+                    text_rank: f.text_rank,
+                });
+                if (hits.length >= limit)
+                    break;
+            }
+            return hits;
+        }
+        const articles = await this.articleRepository.findByVersionIds(ids);
         const articleByVersionId = new Map(articles.map((a) => [a.article_version_id, a]));
         const hits = [];
         for (const f of fused) {
@@ -85,12 +140,14 @@ let ArticleSearchService = class ArticleSearchService {
         return hits;
     }
     // ─── Vector path ──────────────────────────────────────────────────────────────
-    async vectorSearch(query) {
+    async vectorSearch(query, audience = 'internal') {
         await this.ensureCache();
         if (this.cache.length === 0)
             return [];
         const queryEmbedding = await (0, ai_service_1.getEmbedding)(query, 'query');
-        const scored = this.cache.map((c) => ({
+        const scored = this.cache
+            .filter((c) => c.audience === audience)
+            .map((c) => ({
             version_id: c.version_id,
             chunk_id: c._id,
             preview: c.content.slice(0, PREVIEW_LENGTH),

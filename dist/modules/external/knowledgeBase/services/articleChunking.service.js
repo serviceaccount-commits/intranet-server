@@ -30,7 +30,7 @@ let ArticleChunkingService = class ArticleChunkingService {
     /** Re-chunks the given HTML for a version, reusing embeddings whose
      *  content_hash already exists (either on this version or anywhere in the
      *  chunks collection). Embeds only what is genuinely new. */
-    async processVersion(articleId, versionId, html) {
+    async processVersion(articleId, versionId, html, audience = 'internal') {
         const articleOid = new mongodb_1.ObjectId(articleId);
         const versionOid = new mongodb_1.ObjectId(versionId);
         const cleaned = (html ?? '').trim();
@@ -73,7 +73,7 @@ let ArticleChunkingService = class ArticleChunkingService {
                 embedding_model: ai_service_1.EMBEDDING_MODEL,
             });
         }
-        await this.chunkRepository.replaceChunksForVersion(articleOid, versionOid, toPersist);
+        await this.chunkRepository.replaceChunksForVersion(articleOid, versionOid, toPersist, audience);
         this.searchService.invalidateCache();
         return {
             chunksCreated: toPersist.length,
@@ -83,10 +83,10 @@ let ArticleChunkingService = class ArticleChunkingService {
     }
     /** Wrapper for consumers (article create/update flows) that should never
      *  fail the parent operation if chunking fails. Errors are logged. */
-    async processVersionSafe(articleId, versionId, html) {
+    async processVersionSafe(articleId, versionId, html, audience = 'internal') {
         try {
-            const result = await this.processVersion(articleId, versionId, html);
-            logger_1.logger.info(`[chunking] version=${versionId} chunks=${result.chunksCreated} reused=${result.reusedFromCache} embedded=${result.newlyEmbedded}`);
+            const result = await this.processVersion(articleId, versionId, html, audience);
+            logger_1.logger.info(`[chunking] version=${versionId} audience=${audience} chunks=${result.chunksCreated} reused=${result.reusedFromCache} embedded=${result.newlyEmbedded}`);
         }
         catch (error) {
             logger_1.logger.error(`[chunking] failed for version=${versionId}`, error);

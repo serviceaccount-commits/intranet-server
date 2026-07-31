@@ -12,6 +12,7 @@ const api_router_1 = __importDefault(require("./api-layer/api.router"));
 const passport_config_1 = require("./shared/config/passport.config");
 const passport_1 = __importDefault(require("passport"));
 const app = (0, express_1.default)();
+app.disable('x-powered-by'); // no revelar el stack (Express) en las respuestas
 app.use(express_1.default.json({ limit: '25mb' }));
 app.use(express_1.default.urlencoded({ limit: '10mb', extended: true }));
 app.use(express_1.default.text({ limit: '25mb' }));

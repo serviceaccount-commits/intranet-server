@@ -32,6 +32,8 @@ const topics_controller_1 = require("../../modules/external/knowledgeBase/contro
 const article_repository_1 = require("../../modules/external/knowledgeBase/repositories/article.repository");
 const article_service_1 = require("../../modules/external/knowledgeBase/services/article.service");
 const articles_controller_1 = require("../../modules/external/knowledgeBase/controllers/articles.controller");
+const manage_articles_controller_1 = require("../../modules/external/knowledgeBase/controllers/manage-articles.controller");
+const manage_topics_controller_1 = require("../../modules/external/knowledgeBase/controllers/manage-topics.controller");
 const articleChunk_repository_1 = require("../../modules/external/knowledgeBase/repositories/articleChunk.repository");
 const articleChunking_service_1 = require("../../modules/external/knowledgeBase/services/articleChunking.service");
 const articleSearch_service_1 = require("../../modules/external/knowledgeBase/services/articleSearch.service");
@@ -132,6 +134,8 @@ container
     .to(article_repository_1.ArticleRepository);
 container.bind(containerTypes_1.TYPES.IArticleService).to(article_service_1.ArticleService);
 container.bind(articles_controller_1.ArticleController).toSelf();
+container.bind(manage_articles_controller_1.ManageArticlesController).toSelf();
+container.bind(manage_topics_controller_1.ManageTopicsController).toSelf();
 container
     .bind(containerTypes_1.TYPES.IArticleChunkRepository)
     .to(articleChunk_repository_1.ArticleChunkRepository);

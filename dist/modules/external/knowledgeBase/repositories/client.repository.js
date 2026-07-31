@@ -59,6 +59,13 @@ let ClientRepository = class ClientRepository {
     async save(client) {
         return this.repo.save(client);
     }
+    async addUserAccess(clientId, userId) {
+        await data_source_1.AppDataSource.manager
+            .createQueryBuilder()
+            .relation(Client_entity_1.Client, 'users')
+            .of(clientId)
+            .add(userId);
+    }
     async findAndCountAllFiltered(input) {
         const { search, entity, page, limit } = input;
         const where = {};

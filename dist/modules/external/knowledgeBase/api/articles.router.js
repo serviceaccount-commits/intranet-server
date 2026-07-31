@@ -127,6 +127,55 @@ articlesRouter.put('/:articleId/unpublish', async (req, res, next) => {
         next(error);
     }
 });
+articlesRouter.put('/:articleId/availability', async (req, res, next) => {
+    try {
+        await articleController.updateArticleAvailability(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+articlesRouter.put('/:articleId/ai-availability', async (req, res, next) => {
+    try {
+        await articleController.updateArticleAiAvailability(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+articlesRouter.put('/:articleId/property', async (req, res, next) => {
+    try {
+        await articleController.updateArticleProperty(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// ── Client copy (dual view): keyed by the current internal version id ─────────
+articlesRouter.get('/:articleId/client-copy', async (req, res, next) => {
+    try {
+        await articleController.getArticleClientCopy(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+articlesRouter.put('/:articleId/client-copy', async (req, res, next) => {
+    try {
+        await articleController.saveArticleClientCopy(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+articlesRouter.post('/:articleId/client-copy/regenerate', async (req, res, next) => {
+    try {
+        await articleController.regenerateArticleClientCopy(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 articlesRouter.put('/move/:topicId', async (req, res, next) => {
     try {
         await articleController.moveArticleToTopic(req, res);

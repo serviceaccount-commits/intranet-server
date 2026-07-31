@@ -29,6 +29,7 @@ const loadConfig = () => {
         port: parseInt(process.env['PORT'] || '3000', 10),
         internalApiKey: process.env['INTERNAL_API_KEY'] || '',
         internalAdminApiKey: process.env['INTERNAL_ADMIN_API_KEY'] || '',
+        internalWriteApiKey: process.env['INTERNAL_WRITE_API_KEY'] || '',
         environment: process.env['NODE_ENV'] || 'development',
         frontendUrl: process.env['FRONTEND_URL'] || 'http://localhost:5173',
         cookieSecret: process.env['COOKIE_SECRET'] || 'default_cookie_secret_change_me',

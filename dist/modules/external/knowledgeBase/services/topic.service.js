@@ -20,6 +20,7 @@ const AuthenticationError_1 = require("../../../../shared/errors/AuthenticationE
 const ValidationError_1 = require("../../../../shared/errors/ValidationError");
 const CreateTopicSchema_1 = require("../schema/topics/CreateTopicSchema");
 const UpdateTopicSchema_1 = require("../schema/topics/UpdateTopicSchema");
+const ManagedTopicSchemas_1 = require("../schema/manage/ManagedTopicSchemas");
 let TopicService = class TopicService {
     topicRepository;
     clientRepository;
@@ -89,6 +90,58 @@ let TopicService = class TopicService {
             topic.parent_topic_id = newParentId;
         }
         return this.topicRepository.save(topic);
+    }
+    // ─── Managed writes (portal write API, X-API-Key INTERNAL_WRITE_API_KEY) ──────
+    /**
+     * Create a folder/subfolder on behalf of a portal user. The client is
+     * resolved from `clientSharedId`; no real intranet user is required.
+     */
+    async createManagedTopic(clientSharedId, input) {
+        const data = ManagedTopicSchemas_1.CreateManagedTopicSchema.parse(input);
+        const client = await this.clientRepository.findBySharedId(clientSharedId);
+        if (!client)
+            throw new NotFoundError_1.NotFoundError('Client', clientSharedId);
+        // When a parent is given, validate that it belongs to the same client so
+        // folders never get tangled across tenants.
+        if (data.parentTopicId) {
+            const parent = await this.topicRepository.findById(data.parentTopicId);
+            if (!parent)
+                throw new NotFoundError_1.NotFoundError('Topic', data.parentTopicId);
+            if (parent.client_id !== client.client_id) {
+                throw new ValidationError_1.ValidationError('Parent folder belongs to a different client.');
+            }
+        }
+        // Portal users are not intranet users, so there is no owning user_id.
+        // The column is nullable; the human author is conveyed via actorName.
+        return this.topicRepository.create({
+            topic_name: data.topicName,
+            topic_edit_available: true,
+            client_id: client.client_id,
+            parent_topic_id: data.parentTopicId ?? null,
+            user_id: null,
+        });
+    }
+    /**
+     * Rename and/or move a folder on behalf of a portal user. Verifies the topic
+     * belongs to the resolved client, then delegates to the shared rename/move
+     * logic (which guards self-parent, cross-tenant moves, and cycles).
+     */
+    async updateManagedTopic(clientSharedId, topicId, input) {
+        const data = ManagedTopicSchemas_1.UpdateManagedTopicSchema.parse(input);
+        const client = await this.clientRepository.findBySharedId(clientSharedId);
+        if (!client)
+            throw new NotFoundError_1.NotFoundError('Client', clientSharedId);
+        const topic = await this.topicRepository.findById(topicId);
+        if (!topic || topic.client_id !== client.client_id) {
+            throw new NotFoundError_1.NotFoundError('Topic', topicId);
+        }
+        return this.updateTopic({
+            topicId,
+            ...(data.topicName !== undefined && { topicName: data.topicName }),
+            ...(Object.prototype.hasOwnProperty.call(data, 'parentTopicId') && {
+                parentTopicId: data.parentTopicId ?? null,
+            }),
+        });
     }
     async getTopics(clientId) {
         return this.topicRepository.findAllByClientId(clientId);

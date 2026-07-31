@@ -42,6 +42,7 @@ let ArticleExternalService = class ArticleExternalService {
             article_name: v.article_name,
             article_synopsis: v.article_synopsis,
             updated_at: v.updatedAt,
+            article_property: v.article_property,
         }));
     }
     async getArticleByExternalClientAndArticleId(clientSharedId, versionId) {
@@ -57,6 +58,7 @@ let ArticleExternalService = class ArticleExternalService {
                 article_name: view.article_name,
                 article_synopsis: view.article_synopsis,
                 updated_at: view.updatedAt,
+                article_property: view.article_property,
             },
             content: view.content,
         };
@@ -72,6 +74,7 @@ let ArticleExternalService = class ArticleExternalService {
             article_name: v.article_name,
             article_synopsis: v.article_synopsis,
             updated_at: v.updatedAt,
+            article_property: v.article_property,
         }));
     }
     async getArticleByExternalClientAndArticleIdAdmin(clientSharedId, versionId) {
@@ -87,6 +90,7 @@ let ArticleExternalService = class ArticleExternalService {
                 article_name: view.article_name,
                 article_synopsis: view.article_synopsis,
                 updated_at: view.updatedAt,
+                article_property: view.article_property,
             },
             content: view.content,
         };

@@ -20,6 +20,7 @@ const FilterArticleSchema_1 = require("../schema/articles/FilterArticleSchema");
 const zod_1 = require("zod");
 const AppError_1 = require("../../../../shared/errors/AppError");
 const articleSearch_service_1 = require("../services/articleSearch.service");
+const kb_domain_types_1 = require("../database/kb-domain.types");
 let ArticleController = class ArticleController {
     articleService;
     searchService;
@@ -202,6 +203,118 @@ let ArticleController = class ArticleController {
         catch (error) {
             if (error instanceof BusinessLogicError_1.BusinessLogicError) {
                 return res.status(403).json({ message: error.message });
+            }
+            res.status(400).json({ error });
+        }
+    }
+    async updateArticleAvailability(req, res) {
+        const { articleId } = req.params;
+        const userId = req.user?.id;
+        const { available } = req.body;
+        if (!articleId || !userId || typeof available !== 'boolean') {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            const result = await this.articleService.setArticleAvailability(articleId, available);
+            res.json(result);
+        }
+        catch (error) {
+            if (error instanceof BusinessLogicError_1.BusinessLogicError) {
+                return res.status(403).json({ message: error.message });
+            }
+            res.status(400).json({ error });
+        }
+    }
+    async updateArticleAiAvailability(req, res) {
+        const { articleId } = req.params;
+        const userId = req.user?.id;
+        const { available } = req.body;
+        if (!articleId || !userId || typeof available !== 'boolean') {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            const result = await this.articleService.setArticleAiAvailability(articleId, available);
+            res.json(result);
+        }
+        catch (error) {
+            if (error instanceof BusinessLogicError_1.BusinessLogicError) {
+                return res.status(403).json({ message: error.message });
+            }
+            res.status(400).json({ error });
+        }
+    }
+    async updateArticleProperty(req, res) {
+        const { articleId } = req.params;
+        const userId = req.user?.id;
+        const parsed = kb_domain_types_1.ArticlePropertyEnum.safeParse(req.body?.property);
+        if (!articleId || !userId || !parsed.success) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            const result = await this.articleService.setArticleProperty(articleId, parsed.data);
+            res.json(result);
+        }
+        catch (error) {
+            if (error instanceof BusinessLogicError_1.BusinessLogicError) {
+                return res.status(403).json({ message: error.message });
+            }
+            res.status(400).json({ error });
+        }
+    }
+    async getArticleClientCopy(req, res) {
+        const { articleId } = req.params;
+        const userId = req.user?.id;
+        if (!articleId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            const copy = await this.articleService.getArticleClientCopy(articleId);
+            res.json(copy);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                return res.status(error.statusCode).json({ message: error.message });
+            }
+            res.status(400).json({ error });
+        }
+    }
+    async saveArticleClientCopy(req, res) {
+        const { articleId } = req.params;
+        const userId = req.user?.id;
+        if (!articleId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        const { content, articleName, synopsis } = req.body;
+        try {
+            const copy = await this.articleService.saveClientCopy(articleId, { content, articleName, synopsis }, userId);
+            res.json(copy);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                return res.status(error.statusCode).json({ message: error.message });
+            }
+            res.status(400).json({ error });
+        }
+    }
+    async regenerateArticleClientCopy(req, res) {
+        const { articleId } = req.params;
+        const userId = req.user?.id;
+        if (!articleId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            const copy = await this.articleService.regenerateClientCopy(articleId, userId);
+            res.json(copy);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                return res.status(error.statusCode).json({ message: error.message });
             }
             res.status(400).json({ error });
         }

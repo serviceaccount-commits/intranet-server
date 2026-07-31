@@ -27,8 +27,11 @@ const external_clients_router_1 = require("../modules/external/knowledgeBase/api
 const external_topics_router_1 = require("../modules/external/knowledgeBase/api/external-topics.router");
 const admin_router_1 = require("../modules/external/knowledgeBase/api/admin.router");
 const admin_topics_router_1 = require("../modules/external/knowledgeBase/api/admin-topics.router");
+const manage_articles_router_1 = require("../modules/external/knowledgeBase/api/manage-articles.router");
+const manage_topics_router_1 = require("../modules/external/knowledgeBase/api/manage-topics.router");
 const apiKey_middleware_1 = require("../modules/internal/auth/middlewares/apiKey.middleware");
 const adminApiKey_middleware_1 = require("../modules/internal/auth/middlewares/adminApiKey.middleware");
+const writeApiKey_middleware_1 = require("../modules/internal/auth/middlewares/writeApiKey.middleware");
 const documents_router_1 = require("../modules/internal/documents/api/documents.router");
 const auth_middleware_1 = require("../modules/internal/auth/middlewares/auth.middleware");
 const apiLayerRouter = (0, express_1.Router)();
@@ -56,6 +59,8 @@ apiLayerRouter.use('/v1/external/clients', apiKey_middleware_1.verifyApiKey, ext
 apiLayerRouter.use('/v1/external/topics', apiKey_middleware_1.verifyApiKey, external_topics_router_1.externalTopicsRouter);
 apiLayerRouter.use('/v1/external/admin/articles', adminApiKey_middleware_1.verifyAdminApiKey, admin_router_1.adminRouter);
 apiLayerRouter.use('/v1/external/admin/topics', adminApiKey_middleware_1.verifyAdminApiKey, admin_topics_router_1.adminTopicsRouter);
+apiLayerRouter.use('/v1/external/manage/articles', writeApiKey_middleware_1.verifyWriteApiKey, manage_articles_router_1.manageArticlesRouter);
+apiLayerRouter.use('/v1/external/manage/topics', writeApiKey_middleware_1.verifyWriteApiKey, manage_topics_router_1.manageTopicsRouter);
 apiLayerRouter.use('/v1/auth', auth_router_1.authRouter);
 apiLayerRouter.use('/v1/documents', documents_router_1.documentsRouter);
 exports.default = apiLayerRouter;

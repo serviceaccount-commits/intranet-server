@@ -64,6 +64,8 @@ let ArticleRepository = class ArticleRepository {
             locked_by_user_id: article.locked_by_user_id,
             lock_expires_at: article.lock_expires_at,
             available_for_client: article.available_for_client,
+            available_for_ai: article.available_for_ai ?? false,
+            article_property: article.article_property ?? 'paricus',
             article_version_id: version._id.toString(),
             article_name: version.article_name,
             article_synopsis: version.article_synopsis,
@@ -98,6 +100,8 @@ let ArticleRepository = class ArticleRepository {
                     'versions.locked_by_user_id': '$locked_by_user_id',
                     'versions.lock_expires_at': '$lock_expires_at',
                     'versions.available_for_client': '$available_for_client',
+                    'versions.available_for_ai': '$available_for_ai',
+                    'versions.article_property': '$article_property',
                 },
             },
             { $match: { 'versions.article_status': { $in: allowedStatuses } } },
@@ -115,6 +119,26 @@ let ArticleRepository = class ArticleRepository {
         }
         return stages;
     }
+    /** Flattens an article root + its client copy into a serializable view. */
+    toClientCopyView(article, copy) {
+        return {
+            article_id: article._id.toString(),
+            topic_id: article.topic_id,
+            available_for_client: article.available_for_client,
+            article_property: article.article_property ?? 'paricus',
+            client_copy_id: copy._id.toString(),
+            article_name: copy.article_name,
+            article_synopsis: copy.article_synopsis,
+            content: copy.content,
+            updated_by: copy.updated_by,
+            updated_by_name: copy.updated_by_name ?? null,
+            seeded_from_version_id: copy.seeded_from_version_id
+                ? copy.seeded_from_version_id.toString()
+                : null,
+            createdAt: copy.createdAt,
+            updatedAt: copy.updatedAt,
+        };
+    }
     /** Maps an aggregation result (after $unwind + $addFields) back to a view. */
     aggDocToView(doc) {
         const v = doc['versions'];
@@ -125,6 +149,8 @@ let ArticleRepository = class ArticleRepository {
             locked_by_user_id: v['locked_by_user_id'] ?? null,
             lock_expires_at: v['lock_expires_at'] ?? null,
             available_for_client: v['available_for_client'],
+            available_for_ai: v['available_for_ai'] ?? false,
+            article_property: v['article_property'] ?? 'paricus',
             article_version_id: v['_id'].toString(),
             article_name: v['article_name'],
             article_synopsis: v['article_synopsis'],
@@ -165,6 +191,21 @@ let ArticleRepository = class ArticleRepository {
             createdAt: now,
             updatedAt: now,
         };
+        // Saving the first draft also generates the client-facing copy, seeded
+        // from this version. It is then edited independently of the internal track.
+        const clientCopy = {
+            _id: new mongodb_1.ObjectId(),
+            article_name: articleName,
+            article_synopsis: '',
+            content,
+            content_text: this.htmlToText(content),
+            content_storage: 'inline',
+            updated_by: userId,
+            updated_by_name: updatedByName,
+            seeded_from_version_id: versionId,
+            createdAt: now,
+            updatedAt: now,
+        };
         const doc = {
             _id: articleId,
             topic_id: topicId,
@@ -172,7 +213,10 @@ let ArticleRepository = class ArticleRepository {
             locked_by_user_id: null,
             lock_expires_at: null,
             available_for_client: false,
+            available_for_ai: false,
+            article_property: 'paricus',
             versions: [firstVersion],
+            client_copy: clientCopy,
             createdAt: now,
             updatedAt: now,
         };
@@ -312,11 +356,29 @@ let ArticleRepository = class ArticleRepository {
         ];
         return this.paginateVersionPipeline(matchStages, filters, canSeeDraft, page, limit);
     }
+    /** Maps an allowed sort field to its path on the unwound version doc. */
+    buildVersionSort(filters) {
+        // Default keeps the historical behaviour: most recently updated first.
+        const fieldMap = {
+            article_name: 'versions.article_name',
+            updated_by_name: 'versions.updated_by_name',
+            updatedAt: 'versions.updatedAt',
+            article_property: 'versions.article_property',
+            article_status: 'versions.article_status',
+        };
+        const path = filters.sortBy ? fieldMap[filters.sortBy] : 'versions.updatedAt';
+        const dir = filters.sortDir === 'asc' ? 1 : -1;
+        // Tiebreaker on updatedAt keeps paging stable when the sort key has ties.
+        return path === 'versions.updatedAt'
+            ? { [path]: dir }
+            : { [path]: dir, 'versions.updatedAt': -1 };
+    }
     /** Shared pagination helper for all findAndCount* methods. */
     async paginateVersionPipeline(preMatchStages, filters, canSeeDraft, page, limit) {
         const filterStages = this.buildVersionFilterStages(filters, canSeeDraft);
         const basePipeline = [...preMatchStages, ...filterStages];
         const skip = (page - 1) * limit;
+        const sortStage = this.buildVersionSort(filters);
         const [countResult, docs] = await Promise.all([
             this.col
                 .aggregate([...basePipeline, { $count: 'total' }])
@@ -324,7 +386,7 @@ let ArticleRepository = class ArticleRepository {
             this.col
                 .aggregate([
                 ...basePipeline,
-                { $sort: { 'versions.updatedAt': -1 } },
+                { $sort: sortStage },
                 { $skip: skip },
                 { $limit: limit },
                 { $project: { 'versions.content': 0 } }, // exclude content from list view
@@ -405,6 +467,35 @@ let ArticleRepository = class ArticleRepository {
                 updatedAt: now,
             },
         }, { arrayFilters: [{ 'elem._id': { $in: oids } }] });
+    }
+    async setAvailableForClient(versionId, available) {
+        if (!mongodb_1.ObjectId.isValid(versionId))
+            throw new NotFoundError_1.NotFoundError('Version', versionId);
+        // Root-level article field (not per-version), so no positional operator.
+        await this.col.updateOne({ 'versions._id': new mongodb_1.ObjectId(versionId) }, { $set: { available_for_client: available, updatedAt: new Date() } });
+    }
+    async setAvailableForClientByArticleId(articleId, available) {
+        if (!mongodb_1.ObjectId.isValid(articleId))
+            throw new NotFoundError_1.NotFoundError('Article', articleId);
+        await this.col.updateOne({ _id: new mongodb_1.ObjectId(articleId) }, { $set: { available_for_client: available, updatedAt: new Date() } });
+    }
+    async setAvailableForAi(versionId, available) {
+        if (!mongodb_1.ObjectId.isValid(versionId))
+            throw new NotFoundError_1.NotFoundError('Version', versionId);
+        // Root-level article field (not per-version), so no positional operator.
+        await this.col.updateOne({ 'versions._id': new mongodb_1.ObjectId(versionId) }, { $set: { available_for_ai: available, updatedAt: new Date() } });
+    }
+    async setArticleProperty(versionId, property) {
+        if (!mongodb_1.ObjectId.isValid(versionId))
+            throw new NotFoundError_1.NotFoundError('Version', versionId);
+        // Root-level article field (not per-version), so no positional operator.
+        await this.col.updateOne({ 'versions._id': new mongodb_1.ObjectId(versionId) }, { $set: { article_property: property, updatedAt: new Date() } });
+    }
+    /** One-time idempotent backfill: stamps 'paricus' on any legacy doc missing
+     *  the ownership field. Safe to run on every boot ($exists:false filter). */
+    async backfillArticleProperty() {
+        const result = await this.col.updateMany({ article_property: { $exists: false } }, { $set: { article_property: 'paricus' } });
+        return result.modifiedCount;
     }
     // ─── Edit locks ───────────────────────────────────────────────────────────────
     async acquireLock(versionId, userId, expiresAt) {
@@ -540,6 +631,147 @@ let ArticleRepository = class ArticleRepository {
                     article_id: { $toString: '$_id' },
                     version_id: { $toString: '$versions._id' },
                     content: '$versions.content',
+                },
+            },
+        ])
+            .toArray();
+        return docs;
+    }
+    // ─── Client copy (dual view) ────────────────────────────────────────────────
+    async getClientCopyByArticleId(articleId) {
+        if (!mongodb_1.ObjectId.isValid(articleId))
+            return null;
+        const article = await this.col.findOne({ _id: new mongodb_1.ObjectId(articleId) });
+        if (!article || !article.client_copy)
+            return null;
+        return this.toClientCopyView(article, article.client_copy);
+    }
+    async getClientCopyByCopyId(copyId) {
+        if (!mongodb_1.ObjectId.isValid(copyId))
+            return null;
+        const article = await this.col.findOne({ 'client_copy._id': new mongodb_1.ObjectId(copyId) });
+        if (!article || !article.client_copy)
+            return null;
+        return this.toClientCopyView(article, article.client_copy);
+    }
+    async updateClientCopy(articleId, fields, updatedBy, updatedByName = null) {
+        if (!mongodb_1.ObjectId.isValid(articleId))
+            return null;
+        const now = new Date();
+        const set = {
+            'client_copy.updated_by': updatedBy,
+            'client_copy.updated_by_name': updatedByName,
+            'client_copy.updatedAt': now,
+            updatedAt: now,
+        };
+        if (fields.content !== undefined) {
+            set['client_copy.content'] = fields.content;
+            set['client_copy.content_text'] = this.htmlToText(fields.content);
+        }
+        if (fields.name !== undefined)
+            set['client_copy.article_name'] = fields.name;
+        if (fields.synopsis !== undefined)
+            set['client_copy.article_synopsis'] = fields.synopsis;
+        await this.col.updateOne({ _id: new mongodb_1.ObjectId(articleId), 'client_copy._id': { $exists: true } }, { $set: set });
+        return this.getClientCopyByArticleId(articleId);
+    }
+    /** Overwrites the client copy from one of the article's internal versions. */
+    async regenerateClientCopyFromVersion(articleId, versionId, updatedBy, updatedByName = null) {
+        if (!mongodb_1.ObjectId.isValid(articleId) || !mongodb_1.ObjectId.isValid(versionId))
+            return null;
+        const vOid = new mongodb_1.ObjectId(versionId);
+        const article = await this.col.findOne({ _id: new mongodb_1.ObjectId(articleId) });
+        if (!article)
+            return null;
+        const version = article.versions.find((v) => v._id.equals(vOid));
+        if (!version)
+            throw new NotFoundError_1.NotFoundError('Version', versionId);
+        const now = new Date();
+        const copyId = article.client_copy?._id ?? new mongodb_1.ObjectId();
+        const newCopy = {
+            _id: copyId,
+            article_name: version.article_name,
+            article_synopsis: version.article_synopsis,
+            content: version.content,
+            content_text: this.htmlToText(version.content),
+            content_storage: 'inline',
+            updated_by: updatedBy,
+            updated_by_name: updatedByName,
+            seeded_from_version_id: vOid,
+            createdAt: article.client_copy?.createdAt ?? now,
+            updatedAt: now,
+        };
+        await this.col.updateOne({ _id: article._id }, { $set: { client_copy: newCopy, updatedAt: now } });
+        return this.toClientCopyView(article, newCopy);
+    }
+    /** Client-facing list: one client copy per article for the given topics.
+     *  Filters to `available_for_client: true` unless `includeUnavailable`. */
+    async findClientFacingByTopicIds(topicIds, includeUnavailable = false) {
+        if (topicIds.length === 0)
+            return [];
+        const match = {
+            topic_id: { $in: topicIds },
+            'client_copy._id': { $exists: true },
+        };
+        if (!includeUnavailable)
+            match['available_for_client'] = true;
+        const articles = await this.col
+            .find(match)
+            .sort({ 'client_copy.updatedAt': -1 })
+            .toArray();
+        return articles
+            .filter((a) => a.client_copy)
+            .map((a) => this.toClientCopyView(a, a.client_copy));
+    }
+    /** Single client copy by its copy id, scoped to the client's topics.
+     *  Filters to `available_for_client: true` unless `includeUnavailable`. */
+    async findClientFacingByCopyId(topicIds, copyId, includeUnavailable = false) {
+        if (!mongodb_1.ObjectId.isValid(copyId) || topicIds.length === 0)
+            return null;
+        const match = {
+            topic_id: { $in: topicIds },
+            'client_copy._id': new mongodb_1.ObjectId(copyId),
+        };
+        if (!includeUnavailable)
+            match['available_for_client'] = true;
+        const article = await this.col.findOne(match);
+        if (!article || !article.client_copy)
+            return null;
+        return this.toClientCopyView(article, article.client_copy);
+    }
+    /** Resolves client copy views for a set of copy ids (used by client search).
+     *  No availability/topic filter — the caller applies those. */
+    async findClientCopyViewsByCopyIds(copyIds) {
+        const oids = copyIds
+            .filter((id) => mongodb_1.ObjectId.isValid(id))
+            .map((id) => new mongodb_1.ObjectId(id));
+        if (oids.length === 0)
+            return [];
+        const articles = await this.col
+            .find({ 'client_copy._id': { $in: oids } })
+            .toArray();
+        const views = [];
+        for (const article of articles) {
+            if (article.client_copy)
+                views.push(this.toClientCopyView(article, article.client_copy));
+        }
+        return views;
+    }
+    /** Every (article_id, client_copy_id, content) triple for re-chunking client
+     *  copies. Optional `topicIds` scopes to a client. */
+    async findAllClientCopiesForChunking(topicIds) {
+        const match = { 'client_copy._id': { $exists: true } };
+        if (topicIds && topicIds.length > 0)
+            match['topic_id'] = { $in: topicIds };
+        const docs = await this.col
+            .aggregate([
+            { $match: match },
+            {
+                $project: {
+                    _id: 0,
+                    article_id: { $toString: '$_id' },
+                    copy_id: { $toString: '$client_copy._id' },
+                    content: '$client_copy.content',
                 },
             },
         ])

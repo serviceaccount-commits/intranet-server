@@ -15,7 +15,7 @@ let ArticleChunkRepository = class ArticleChunkRepository {
     get col() {
         return (0, kb_collections_1.getArticleChunksCollection)((0, mongo_connection_1.getMongoDb)());
     }
-    async replaceChunksForVersion(articleId, versionId, chunks) {
+    async replaceChunksForVersion(articleId, versionId, chunks, audience = 'internal') {
         await this.col.deleteMany({ version_id: versionId });
         if (chunks.length === 0)
             return;
@@ -30,6 +30,7 @@ let ArticleChunkRepository = class ArticleChunkRepository {
             token_count: c.token_count,
             embedding: c.embedding,
             embedding_model: c.embedding_model,
+            audience,
             createdAt: now,
             updatedAt: now,
         }));
@@ -48,7 +49,7 @@ let ArticleChunkRepository = class ArticleChunkRepository {
     }
     async loadAllForSearch() {
         const docs = await this.col
-            .find({}, { projection: { content: 1, embedding: 1, article_id: 1, version_id: 1, chunk_index: 1 } })
+            .find({}, { projection: { content: 1, embedding: 1, article_id: 1, version_id: 1, chunk_index: 1, audience: 1 } })
             .toArray();
         return docs.map((d) => ({
             _id: d._id.toString(),
@@ -57,6 +58,8 @@ let ArticleChunkRepository = class ArticleChunkRepository {
             chunk_index: d.chunk_index,
             content: d.content,
             embedding: d.embedding,
+            // Chunks written before dual-view have no audience → treat as internal.
+            audience: d.audience ?? 'internal',
         }));
     }
     async deleteByVersionId(versionId) {
