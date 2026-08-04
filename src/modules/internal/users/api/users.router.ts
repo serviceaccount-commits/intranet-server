@@ -35,6 +35,20 @@ usersRouter.post(
   },
 );
 
+usersRouter.post(
+  '/onboarding-completed',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!userController) {
+        userController = container.get<UserController>(UserController);
+      }
+      await userController.completeOnboarding(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 usersRouter.get(
   '/',
   authenticateJWT,

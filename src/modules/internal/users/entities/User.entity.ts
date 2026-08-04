@@ -147,6 +147,10 @@ export class User extends BaseEntity {
   @Column({ type: 'timestamptz', nullable: true })
   last_activity_at?: Date;
 
+  // NULL = the user has not completed (or dismissed) the onboarding tour yet
+  @Column({ type: 'timestamptz', nullable: true })
+  onboarding_completed_at?: Date;
+
   @CreateDateColumn()
   createdAt!: Date;
 

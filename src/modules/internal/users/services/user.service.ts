@@ -268,6 +268,10 @@ export class UserService implements IUserService {
     await this.userRepository.updateUserLastActivity(userId);
   }
 
+  async completeUserOnboarding(userId: string): Promise<void> {
+    await this.userRepository.completeUserOnboarding(userId);
+  }
+
   async getUsers(): Promise<User[]> {
     return await this.userRepository.findAllUsers();
   }

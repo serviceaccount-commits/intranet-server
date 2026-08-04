@@ -133,6 +133,7 @@ authRouter.get('/me', authenticateJWT, async (req: Request, res: Response, next:
         username: `${fullUser.first_name} ${fullUser.last_name}`,
         worksInIM,
         worksInFLX,
+        hasCompletedOnboarding: !!fullUser.onboarding_completed_at,
       },
       permissions,
     });

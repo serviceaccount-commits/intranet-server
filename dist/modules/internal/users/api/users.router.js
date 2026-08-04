@@ -33,6 +33,17 @@ usersRouter.post('/last-activity', async (req, res, next) => {
         next(error);
     }
 });
+usersRouter.post('/onboarding-completed', async (req, res, next) => {
+    try {
+        if (!userController) {
+            userController = inversify_config_1.container.get(users_controller_1.default);
+        }
+        await userController.completeOnboarding(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 usersRouter.get('/', auth_middleware_1.authenticateJWT, async (req, res, next) => {
     try {
         if (!userController) {

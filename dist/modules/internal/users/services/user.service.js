@@ -186,6 +186,9 @@ let UserService = class UserService {
     async updateUserLastActivity(userId) {
         await this.userRepository.updateUserLastActivity(userId);
     }
+    async completeUserOnboarding(userId) {
+        await this.userRepository.completeUserOnboarding(userId);
+    }
     async getUsers() {
         return await this.userRepository.findAllUsers();
     }

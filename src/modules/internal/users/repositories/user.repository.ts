@@ -1,4 +1,4 @@
-import { Brackets, In } from 'typeorm';
+import { Brackets, In, IsNull } from 'typeorm';
 import { AppDataSource } from '../../../../shared/database/data-source';
 import { User } from '../entities/User.entity';
 import { UserDetails } from '../entities/UserDetail.entity';
@@ -17,6 +17,15 @@ export class UserRepository implements IUserRepository {
     await AppDataSource.manager.update(User, userId, {
       last_activity_at: new Date(),
     });
+  }
+
+  async completeUserOnboarding(userId: string): Promise<void> {
+    // Write-once: the first completion timestamp is preserved
+    await AppDataSource.manager.update(
+      User,
+      { user_id: userId, onboarding_completed_at: IsNull() },
+      { onboarding_completed_at: new Date() },
+    );
   }
 
   async findAllUsers(): Promise<User[]> {

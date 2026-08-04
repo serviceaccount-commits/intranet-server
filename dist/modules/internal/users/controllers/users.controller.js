@@ -78,6 +78,22 @@ let UserController = class UserController {
                 .json({ message: 'An internal server error ocurred.' });
         }
     }
+    async completeOnboarding(req, res) {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                return res.status(400).json({ error: 'Invalid user id' });
+            }
+            await this.userService.completeUserOnboarding(userId);
+            res.sendStatus(200);
+        }
+        catch (error) {
+            logger_1.logger.error('Unexpected error in UserController:', error);
+            return res
+                .status(500)
+                .json({ message: 'An internal server error ocurred.' });
+        }
+    }
     async getSheetData(req, res, next) {
         try {
             const userId = req.user?.id;

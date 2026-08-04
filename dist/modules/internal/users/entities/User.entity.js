@@ -52,6 +52,8 @@ let User = class User extends typeorm_1.BaseEntity {
     customFieldValues;
     email_verified;
     last_activity_at;
+    // NULL = the user has not completed (or dismissed) the onboarding tour yet
+    onboarding_completed_at;
     createdAt;
     updatedAt;
     addId() {
@@ -189,6 +191,10 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
     __metadata("design:type", Date)
 ], User.prototype, "last_activity_at", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Date)
+], User.prototype, "onboarding_completed_at", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

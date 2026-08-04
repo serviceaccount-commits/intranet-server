@@ -77,6 +77,24 @@ export default class UserController {
     }
   }
 
+  async completeOnboarding(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(400).json({ error: 'Invalid user id' });
+      }
+
+      await this.userService.completeUserOnboarding(userId);
+
+      res.sendStatus(200);
+    } catch (error) {
+      logger.error('Unexpected error in UserController:', error);
+      return res
+        .status(500)
+        .json({ message: 'An internal server error ocurred.' });
+    }
+  }
+
   async getSheetData(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user?.id;

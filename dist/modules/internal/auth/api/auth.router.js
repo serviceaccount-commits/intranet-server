@@ -107,6 +107,7 @@ authRouter.get('/me', auth_middleware_1.authenticateJWT, async (req, res, next) 
                 username: `${fullUser.first_name} ${fullUser.last_name}`,
                 worksInIM,
                 worksInFLX,
+                hasCompletedOnboarding: !!fullUser.onboarding_completed_at,
             },
             permissions,
         });

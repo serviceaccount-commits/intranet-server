@@ -15,6 +15,10 @@ class UserRepository {
             last_activity_at: new Date(),
         });
     }
+    async completeUserOnboarding(userId) {
+        // Write-once: the first completion timestamp is preserved
+        await data_source_1.AppDataSource.manager.update(User_entity_1.User, { user_id: userId, onboarding_completed_at: (0, typeorm_1.IsNull)() }, { onboarding_completed_at: new Date() });
+    }
     async findAllUsers() {
         return await data_source_1.AppDataSource.manager.find(User_entity_1.User);
     }

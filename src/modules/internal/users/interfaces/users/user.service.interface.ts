@@ -24,6 +24,7 @@ export interface RankingRow {
 export interface IUserService {
   createUser(userData: CreateUserInput): Promise<User>;
   updateUserLastActivity(userId: string): Promise<void>;
+  completeUserOnboarding(userId: string): Promise<void>;
   getUsers(): Promise<User[]>;
   findUsers(filters: FilterUserInput): Promise<PaginatedUsersResult>;
   getUserById(userId: string): Promise<User>;

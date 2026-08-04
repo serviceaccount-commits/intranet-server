@@ -8,6 +8,7 @@ import { PaginatedUsersResult } from './user.service.interface';
 export interface IUserRepository {
   createUser(user: User): Promise<User>;
   updateUserLastActivity(userId: string): Promise<void>;
+  completeUserOnboarding(userId: string): Promise<void>;
   findAllUsers(): Promise<User[]>;
   findAndCountUsers(filters: FilterUserInput): Promise<PaginatedUsersResult>;
   findAndCountPostUsers(
