@@ -18,6 +18,6 @@ export interface ITopicService {
     topicId: string,
     input: UpdateManagedTopicInput,
   ): Promise<KbTopic>;
-  getTopics(clientId: string): Promise<KbTopic[]>;
-  getTopicById(topicId: string): Promise<KbTopic>;
+  getTopics(clientId: string, userId: string): Promise<KbTopic[]>;
+  getTopicById(topicId: string, userId: string): Promise<KbTopic>;
 }

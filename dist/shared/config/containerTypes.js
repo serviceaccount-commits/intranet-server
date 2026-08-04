@@ -23,6 +23,7 @@ const TYPES = {
     IArticleChunkRepository: Symbol.for('IArticleChunkRepository'),
     IArticleChunkingService: Symbol.for('IArticleChunkingService'),
     IArticleSearchService: Symbol.for('IArticleSearchService'),
+    IKbAccessService: Symbol.for('IKbAccessService'),
     ITagRepository: Symbol.for('ITagRepository'),
     ITagService: Symbol.for('ITagService'),
     IAnnouncementRepository: Symbol.for('IAnnouncementRepository'),

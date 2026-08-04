@@ -60,6 +60,7 @@ const ai_service_1 = require("../../../../shared/utils/ai.service");
 const kb_constants_1 = require("../kb.constants");
 const articleChunking_service_1 = require("./articleChunking.service");
 const articleSearch_service_1 = require("./articleSearch.service");
+const kbAccess_service_1 = require("./kbAccess.service");
 const KB_PERM_VIEW_METADATA = 'kb:article:view:metadata';
 let ArticleService = class ArticleService {
     static { ArticleService_1 = this; }
@@ -70,7 +71,8 @@ let ArticleService = class ArticleService {
     tagRepository;
     chunkingService;
     searchService;
-    constructor(articleRepository, topicRepository, clientRepository, userRepository, tagRepository, chunkingService, searchService) {
+    kbAccess;
+    constructor(articleRepository, topicRepository, clientRepository, userRepository, tagRepository, chunkingService, searchService, kbAccess) {
         this.articleRepository = articleRepository;
         this.topicRepository = topicRepository;
         this.clientRepository = clientRepository;
@@ -78,6 +80,14 @@ let ArticleService = class ArticleService {
         this.tagRepository = tagRepository;
         this.chunkingService = chunkingService;
         this.searchService = searchService;
+        this.kbAccess = kbAccess;
+    }
+    /** Asserts the user may read the client that owns this article version. */
+    async assertVersionAccess(userId, versionId) {
+        const view = await this.articleRepository.findByVersionId(versionId);
+        if (!view)
+            throw new NotFoundError_1.NotFoundError('Article', versionId);
+        await this.kbAccess.assertTopicAccess(userId, view.topic_id);
     }
     // ─── Helpers ──────────────────────────────────────────────────────────────────
     async getCanSeeDraft(userId) {
@@ -106,10 +116,11 @@ let ArticleService = class ArticleService {
         return created;
     }
     // ─── Client copy (dual view) ───────────────────────────────────────────────────
-    async getArticleClientCopy(versionId) {
+    async getArticleClientCopy(versionId, userId) {
         const version = await this.articleRepository.findByVersionId(versionId);
         if (!version)
             throw new NotFoundError_1.NotFoundError('Article', versionId);
+        await this.kbAccess.assertTopicAccess(userId, version.topic_id);
         const copy = await this.articleRepository.getClientCopyByArticleId(version.article_id);
         if (!copy)
             throw new NotFoundError_1.NotFoundError('Client copy', versionId);
@@ -261,7 +272,8 @@ let ArticleService = class ArticleService {
         await this.articleRepository.removeTagFromVersion(versionId, tagId);
     }
     // ─── Queries ──────────────────────────────────────────────────────────────────
-    async getArticles(topicId) {
+    async getArticles(topicId, userId) {
+        await this.kbAccess.assertTopicAccess(userId, topicId);
         return this.articleRepository.findAllLatestByTopicId(topicId);
     }
     async findLatestArticlesByUserId(userId) {
@@ -277,9 +289,16 @@ let ArticleService = class ArticleService {
     }
     async findArticles(filters, userId) {
         const canSeeDraft = await this.getCanSeeDraft(userId);
-        return this.articleRepository.findAndCount(filters, canSeeDraft);
+        // Scope the general list to the clients granted to this user
+        // (user_clients); KB managers (kb:client:manage) see everything.
+        const topicIds = await this.kbAccess.accessibleTopicIds(userId);
+        if (topicIds === null) {
+            return this.articleRepository.findAndCount(filters, canSeeDraft);
+        }
+        return this.articleRepository.findAndCountByTopicIds(topicIds, filters, canSeeDraft);
     }
     async findArticlesByClientId(clientId, filters, userId) {
+        await this.kbAccess.assertClientAccess(userId, clientId);
         const canSeeDraft = await this.getCanSeeDraft(userId);
         const topics = await this.topicRepository.findAllByClientId(clientId);
         if (topics.length === 0)
@@ -288,6 +307,7 @@ let ArticleService = class ArticleService {
         return this.articleRepository.findAndCountByTopicIds(topicIds, filters, canSeeDraft);
     }
     async findArticlesByTopicId(topicId, filters, userId) {
+        await this.kbAccess.assertTopicAccess(userId, topicId);
         const canSeeDraft = await this.getCanSeeDraft(userId);
         return this.articleRepository.findAndCountByTopicId(topicId, filters, canSeeDraft);
     }
@@ -297,10 +317,11 @@ let ArticleService = class ArticleService {
             throw new NotFoundError_1.NotFoundError('Article', versionId);
         return article;
     }
-    async getArticleWithDetails(versionId) {
+    async getArticleWithDetails(versionId, userId) {
         const view = await this.articleRepository.findByVersionId(versionId);
         if (!view)
             throw new NotFoundError_1.NotFoundError('Article', versionId);
+        await this.kbAccess.assertTopicAccess(userId, view.topic_id);
         const [tags, topic, creator, updater, publisher] = await Promise.all([
             this.tagRepository.findByIds(view.tag_ids),
             this.topicRepository.findById(view.topic_id),
@@ -337,10 +358,11 @@ let ArticleService = class ArticleService {
             article_property: view.article_property ?? 'paricus',
         };
     }
-    async getArticleDocumentById(versionId) {
+    async getArticleDocumentById(versionId, userId) {
         const article = await this.articleRepository.findByVersionId(versionId);
         if (!article)
             throw new NotFoundError_1.NotFoundError('Article', versionId);
+        await this.kbAccess.assertTopicAccess(userId, article.topic_id);
         return article.content;
     }
     // ─── Lifecycle ────────────────────────────────────────────────────────────────
@@ -351,7 +373,8 @@ let ArticleService = class ArticleService {
             throw new NotFoundError_1.NotFoundError('Topic', data.topicId);
         await this.articleRepository.moveArticlesToTopic(data.articleIds, data.topicId);
     }
-    async getArticleVersionsByArticleVersionId(versionId) {
+    async getArticleVersionsByArticleVersionId(versionId, userId) {
+        await this.assertVersionAccess(userId, versionId);
         const versions = await this.articleRepository.findVersionsByVersionId(versionId);
         if (versions.length === 0)
             throw new BusinessLogicError_1.BusinessLogicError('No versions found.');
@@ -511,7 +534,15 @@ let ArticleService = class ArticleService {
         await this.chunkingService.processVersionSafe(current.article_id, current.client_copy_id, '', 'client');
         return { article_status: 'unavailable' };
     }
-    async findSharedArticlesByClientSharedId(filters, clientSharedId, topicId) {
+    async findSharedArticlesByClientSharedId(filters, clientSharedId, topicId, userId) {
+        // `userId` is present only on the internal (staff JWT) route — scope it.
+        // API-key (portal) calls pass no user; the portal enforces its own scoping.
+        if (userId) {
+            const client = await this.clientRepository.findBySharedId(clientSharedId);
+            if (!client)
+                throw new NotFoundError_1.NotFoundError('Client', clientSharedId);
+            await this.kbAccess.assertClientAccess(userId, client.client_id);
+        }
         const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, topicId);
         if (topicIds.length === 0)
             return [];
@@ -678,7 +709,9 @@ exports.ArticleService = ArticleService = ArticleService_1 = __decorate([
     __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.ITagRepository)),
     __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleChunkingService)),
     __param(6, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleSearchService)),
+    __param(7, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbAccessService)),
     __metadata("design:paramtypes", [Object, Object, Object, Object, Object, articleChunking_service_1.ArticleChunkingService,
-        articleSearch_service_1.ArticleSearchService])
+        articleSearch_service_1.ArticleSearchService,
+        kbAccess_service_1.KbAccessService])
 ], ArticleService);
 //# sourceMappingURL=article.service.js.map

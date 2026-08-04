@@ -16,6 +16,7 @@ import {
   UpdateManagedTopicInput,
   UpdateManagedTopicSchema,
 } from '../schema/manage/ManagedTopicSchemas';
+import { KbAccessService } from './kbAccess.service';
 
 @injectable()
 export class TopicService implements ITopicService {
@@ -26,6 +27,8 @@ export class TopicService implements ITopicService {
     private clientRepository: IClientRepository,
     @inject(TYPES.IUserRepository)
     private userRepository: IUserRepository,
+    @inject(TYPES.IKbAccessService)
+    private kbAccess: KbAccessService,
   ) {}
 
   async createTopic(input: CreateTopicInput): Promise<KbTopic> {
@@ -171,13 +174,15 @@ export class TopicService implements ITopicService {
     });
   }
 
-  async getTopics(clientId: string): Promise<KbTopic[]> {
+  async getTopics(clientId: string, userId: string): Promise<KbTopic[]> {
+    await this.kbAccess.assertClientAccess(userId, clientId);
     return this.topicRepository.findAllByClientId(clientId);
   }
 
-  async getTopicById(topicId: string): Promise<KbTopic> {
+  async getTopicById(topicId: string, userId: string): Promise<KbTopic> {
     const topic = await this.topicRepository.findById(topicId);
     if (!topic) throw new NotFoundError('Topic', topicId);
+    await this.kbAccess.assertClientAccess(userId, topic.client_id);
     return topic;
   }
 }

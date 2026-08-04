@@ -20,13 +20,16 @@ const FilterArticleSchema_1 = require("../schema/articles/FilterArticleSchema");
 const zod_1 = require("zod");
 const AppError_1 = require("../../../../shared/errors/AppError");
 const articleSearch_service_1 = require("../services/articleSearch.service");
+const kbAccess_service_1 = require("../services/kbAccess.service");
 const kb_domain_types_1 = require("../database/kb-domain.types");
 let ArticleController = class ArticleController {
     articleService;
     searchService;
-    constructor(articleService, searchService) {
+    kbAccess;
+    constructor(articleService, searchService, kbAccess) {
         this.articleService = articleService;
         this.searchService = searchService;
+        this.kbAccess = kbAccess;
     }
     async searchArticles(req, res) {
         const userId = req.user?.id;
@@ -46,7 +49,18 @@ let ArticleController = class ArticleController {
             ? statusesParam.split(',').map((s) => s.trim()).filter(Boolean)
             : undefined;
         try {
-            const hits = await this.searchService.search(q, { limit, statuses });
+            // Scope search results to the clients granted to this user; KB managers
+            // search everything (null = unrestricted).
+            const topicIds = await this.kbAccess.accessibleTopicIds(userId);
+            if (topicIds !== null && topicIds.length === 0) {
+                res.json({ hits: [] });
+                return;
+            }
+            const hits = await this.searchService.search(q, {
+                limit,
+                statuses,
+                ...(topicIds !== null && { topicIds }),
+            });
             res.json({ hits });
         }
         catch (error) {
@@ -272,7 +286,7 @@ let ArticleController = class ArticleController {
             return;
         }
         try {
-            const copy = await this.articleService.getArticleClientCopy(articleId);
+            const copy = await this.articleService.getArticleClientCopy(articleId, userId);
             res.json(copy);
         }
         catch (error) {
@@ -416,11 +430,12 @@ let ArticleController = class ArticleController {
     }
     async getArticles(req, res) {
         const { topicId } = req.params;
-        if (!topicId) {
+        const userId = req.user?.id;
+        if (!topicId || !userId) {
             res.sendStatus(400);
             return;
         }
-        const articles = await this.articleService.getArticles(topicId);
+        const articles = await this.articleService.getArticles(topicId, userId);
         return res.json(articles);
     }
     async getArticlesFiltered(req, res, next) {
@@ -530,30 +545,33 @@ let ArticleController = class ArticleController {
     }
     async getArticleById(req, res) {
         const { articleId } = req.params;
-        if (!articleId) {
+        const userId = req.user?.id;
+        if (!articleId || !userId) {
             res.sendStatus(400);
             return;
         }
-        const article = await this.articleService.getArticleWithDetails(articleId);
+        const article = await this.articleService.getArticleWithDetails(articleId, userId);
         return res.json(article);
     }
     async getArticleDocumentById(req, res) {
         const { articleId } = req.params;
-        if (!articleId) {
+        const userId = req.user?.id;
+        if (!articleId || !userId) {
             res.sendStatus(400);
             return;
         }
-        const article = await this.articleService.getArticleDocumentById(articleId);
+        const article = await this.articleService.getArticleDocumentById(articleId, userId);
         res.setHeader('Content-Type', 'text/plain');
         res.status(200).send(article);
     }
     async getArticleVersions(req, res) {
         const { articleId } = req.params;
-        if (!articleId) {
+        const userId = req.user?.id;
+        if (!articleId || !userId) {
             res.sendStatus(400);
             return;
         }
-        const article = await this.articleService.getArticleVersionsByArticleVersionId(articleId);
+        const article = await this.articleService.getArticleVersionsByArticleVersionId(articleId, userId);
         res.setHeader('Content-Type', 'text/plain');
         res.status(200).send(article);
     }
@@ -566,7 +584,9 @@ let ArticleController = class ArticleController {
             return;
         }
         try {
-            const articles = await this.articleService.findSharedArticlesByClientSharedId(validationResult, clientSharedId, topicId);
+            // On the internal (staff JWT) route req.user is set and scopes the
+            // request; API-key calls have no req.user (portal scopes those itself).
+            const articles = await this.articleService.findSharedArticlesByClientSharedId(validationResult, clientSharedId, topicId, req.user?.id);
             return res.json(articles);
         }
         catch (error) {
@@ -713,6 +733,8 @@ exports.ArticleController = ArticleController = __decorate([
     (0, inversify_1.injectable)(),
     __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleService)),
     __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleSearchService)),
-    __metadata("design:paramtypes", [Object, articleSearch_service_1.ArticleSearchService])
+    __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbAccessService)),
+    __metadata("design:paramtypes", [Object, articleSearch_service_1.ArticleSearchService,
+        kbAccess_service_1.KbAccessService])
 ], ArticleController);
 //# sourceMappingURL=articles.controller.js.map

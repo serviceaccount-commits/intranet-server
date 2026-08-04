@@ -10,6 +10,7 @@ import { AppError } from '../../../../shared/errors/AppError';
 import { MoveArticleInput } from '../schema/clients/MoveArticleSchema';
 import { CreateVersionInput } from '../schema/articles/CreateVersionSchema';
 import { ArticleSearchService } from '../services/articleSearch.service';
+import { KbAccessService } from '../services/kbAccess.service';
 import { ArticleStatus, ArticlePropertyEnum } from '../database/kb-domain.types';
 
 @injectable()
@@ -17,6 +18,7 @@ export class ArticleController {
   constructor(
     @inject(TYPES.IArticleService) private articleService: IArticleService,
     @inject(TYPES.IArticleSearchService) private searchService: ArticleSearchService,
+    @inject(TYPES.IKbAccessService) private kbAccess: KbAccessService,
   ) {}
 
   async searchArticles(req: Request, res: Response) {
@@ -41,7 +43,18 @@ export class ArticleController {
       : undefined;
 
     try {
-      const hits = await this.searchService.search(q, { limit, statuses });
+      // Scope search results to the clients granted to this user; KB managers
+      // search everything (null = unrestricted).
+      const topicIds = await this.kbAccess.accessibleTopicIds(userId);
+      if (topicIds !== null && topicIds.length === 0) {
+        res.json({ hits: [] });
+        return;
+      }
+      const hits = await this.searchService.search(q, {
+        limit,
+        statuses,
+        ...(topicIds !== null && { topicIds }),
+      });
       res.json({ hits });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -310,7 +323,7 @@ export class ArticleController {
       return;
     }
     try {
-      const copy = await this.articleService.getArticleClientCopy(articleId);
+      const copy = await this.articleService.getArticleClientCopy(articleId, userId);
       res.json(copy);
     } catch (error) {
       if (error instanceof AppError) {
@@ -477,13 +490,14 @@ export class ArticleController {
 
   async getArticles(req: Request, res: Response) {
     const { topicId } = req.params;
+    const userId = req.user?.id;
 
-    if (!topicId) {
+    if (!topicId || !userId) {
       res.sendStatus(400);
       return;
     }
 
-    const articles = await this.articleService.getArticles(topicId);
+    const articles = await this.articleService.getArticles(topicId, userId);
 
     return res.json(articles);
   }
@@ -635,26 +649,28 @@ export class ArticleController {
 
   async getArticleById(req: Request, res: Response) {
     const { articleId } = req.params;
+    const userId = req.user?.id;
 
-    if (!articleId) {
+    if (!articleId || !userId) {
       res.sendStatus(400);
       return;
     }
 
-    const article = await this.articleService.getArticleWithDetails(articleId);
+    const article = await this.articleService.getArticleWithDetails(articleId, userId);
 
     return res.json(article);
   }
 
   async getArticleDocumentById(req: Request, res: Response) {
     const { articleId } = req.params;
+    const userId = req.user?.id;
 
-    if (!articleId) {
+    if (!articleId || !userId) {
       res.sendStatus(400);
       return;
     }
 
-    const article = await this.articleService.getArticleDocumentById(articleId);
+    const article = await this.articleService.getArticleDocumentById(articleId, userId);
 
     res.setHeader('Content-Type', 'text/plain');
 
@@ -663,14 +679,15 @@ export class ArticleController {
 
   async getArticleVersions(req: Request, res: Response) {
     const { articleId } = req.params;
+    const userId = req.user?.id;
 
-    if (!articleId) {
+    if (!articleId || !userId) {
       res.sendStatus(400);
       return;
     }
 
     const article =
-      await this.articleService.getArticleVersionsByArticleVersionId(articleId);
+      await this.articleService.getArticleVersionsByArticleVersionId(articleId, userId);
 
     res.setHeader('Content-Type', 'text/plain');
 
@@ -693,11 +710,14 @@ export class ArticleController {
     }
 
     try {
+      // On the internal (staff JWT) route req.user is set and scopes the
+      // request; API-key calls have no req.user (portal scopes those itself).
       const articles =
         await this.articleService.findSharedArticlesByClientSharedId(
           validationResult,
           clientSharedId,
           topicId,
+          req.user?.id,
         );
 
       return res.json(articles);

@@ -50,6 +50,7 @@ import { IArticleChunkRepository } from '../../modules/external/knowledgeBase/in
 import { ArticleChunkRepository } from '../../modules/external/knowledgeBase/repositories/articleChunk.repository';
 import { ArticleChunkingService } from '../../modules/external/knowledgeBase/services/articleChunking.service';
 import { ArticleSearchService } from '../../modules/external/knowledgeBase/services/articleSearch.service';
+import { KbAccessService } from '../../modules/external/knowledgeBase/services/kbAccess.service';
 import { ITagRepository } from '../../modules/external/knowledgeBase/interfaces/tags/tag.repository.interface';
 import { TagRepository } from '../../modules/external/knowledgeBase/repositories/tag.repository';
 import { ITagService } from '../../modules/external/knowledgeBase/interfaces/tags/tag.service.interface';
@@ -204,6 +205,7 @@ container
   .bind<ArticleSearchService>(TYPES.IArticleSearchService)
   .to(ArticleSearchService)
   .inSingletonScope();
+container.bind<KbAccessService>(TYPES.IKbAccessService).to(KbAccessService);
 
 container.bind<ITagRepository>(TYPES.ITagRepository).to(TagRepository);
 container.bind<ITagService>(TYPES.ITagService).to(TagService);

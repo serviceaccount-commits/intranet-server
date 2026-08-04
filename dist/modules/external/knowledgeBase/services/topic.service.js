@@ -21,14 +21,17 @@ const ValidationError_1 = require("../../../../shared/errors/ValidationError");
 const CreateTopicSchema_1 = require("../schema/topics/CreateTopicSchema");
 const UpdateTopicSchema_1 = require("../schema/topics/UpdateTopicSchema");
 const ManagedTopicSchemas_1 = require("../schema/manage/ManagedTopicSchemas");
+const kbAccess_service_1 = require("./kbAccess.service");
 let TopicService = class TopicService {
     topicRepository;
     clientRepository;
     userRepository;
-    constructor(topicRepository, clientRepository, userRepository) {
+    kbAccess;
+    constructor(topicRepository, clientRepository, userRepository, kbAccess) {
         this.topicRepository = topicRepository;
         this.clientRepository = clientRepository;
         this.userRepository = userRepository;
+        this.kbAccess = kbAccess;
     }
     async createTopic(input) {
         const data = CreateTopicSchema_1.CreateTopicSchema.parse(input);
@@ -143,13 +146,15 @@ let TopicService = class TopicService {
             }),
         });
     }
-    async getTopics(clientId) {
+    async getTopics(clientId, userId) {
+        await this.kbAccess.assertClientAccess(userId, clientId);
         return this.topicRepository.findAllByClientId(clientId);
     }
-    async getTopicById(topicId) {
+    async getTopicById(topicId, userId) {
         const topic = await this.topicRepository.findById(topicId);
         if (!topic)
             throw new NotFoundError_1.NotFoundError('Topic', topicId);
+        await this.kbAccess.assertClientAccess(userId, topic.client_id);
         return topic;
     }
 };
@@ -159,6 +164,7 @@ exports.TopicService = TopicService = __decorate([
     __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.ITopicRepository)),
     __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IClientRepository)),
     __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserRepository)),
-    __metadata("design:paramtypes", [Object, Object, Object])
+    __param(3, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbAccessService)),
+    __metadata("design:paramtypes", [Object, Object, Object, kbAccess_service_1.KbAccessService])
 ], TopicService);
 //# sourceMappingURL=topic.service.js.map

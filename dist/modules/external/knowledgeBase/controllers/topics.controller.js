@@ -46,20 +46,22 @@ let TopicController = class TopicController {
     }
     async getTopics(req, res) {
         const { clientId } = req.params;
-        if (!clientId) {
+        const userId = req.user?.id;
+        if (!clientId || !userId) {
             res.sendStatus(400);
             return;
         }
-        const topics = await this.topicService.getTopics(clientId);
+        const topics = await this.topicService.getTopics(clientId, userId);
         return res.json(topics);
     }
     async getTopicById(req, res) {
         const { topicId } = req.params;
-        if (!topicId) {
+        const userId = req.user?.id;
+        if (!topicId || !userId) {
             res.sendStatus(400);
             return;
         }
-        const topic = await this.topicService.getTopicById(topicId);
+        const topic = await this.topicService.getTopicById(topicId, userId);
         return res.json(topic);
     }
 };

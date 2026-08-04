@@ -71,7 +71,7 @@ export interface IArticleService {
   removeTagFromArticle(versionId: string, tagId: string): Promise<void>;
 
   // ── Queries ──────────────────────────────────────────────────────────────────
-  getArticles(topicId: string): Promise<KbArticleVersionView[]>;
+  getArticles(topicId: string, userId: string): Promise<KbArticleVersionView[]>;
   findLatestArticlesByUserId(userId: string): Promise<KbArticleVersionView[]>;
 
   findArticles(
@@ -92,7 +92,7 @@ export interface IArticleService {
   ): Promise<PaginatedArticlesResult>;
 
   getArticleById(versionId: string): Promise<KbArticleVersionView>;
-  getArticleWithDetails(versionId: string): Promise<{
+  getArticleWithDetails(versionId: string, userId: string): Promise<{
     article: {
       article_version_id: string;
       article_name: string;
@@ -114,13 +114,14 @@ export interface IArticleService {
     available_for_ai: boolean;
     article_property: ArticleProperty;
   }>;
-  getArticleDocumentById(versionId: string): Promise<string>;
+  getArticleDocumentById(versionId: string, userId: string): Promise<string>;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
   moveArticleToTopic(input: MoveArticleInput, userId: string): Promise<void>;
 
   getArticleVersionsByArticleVersionId(
     versionId: string,
+    userId: string,
   ): Promise<KbArticleVersionView[]>;
 
   publishVersion(versionId: string): Promise<KbArticleVersionView>;
@@ -150,7 +151,10 @@ export interface IArticleService {
 
   // ── Client copy (dual view) ────────────────────────────────────────────────
   /** The client-facing copy of the article that contains `versionId`. */
-  getArticleClientCopy(versionId: string): Promise<KbClientCopyView>;
+  getArticleClientCopy(
+    versionId: string,
+    userId: string,
+  ): Promise<KbClientCopyView>;
   /** Overwrites the client copy (independent of internal versions) + re-chunks. */
   saveClientCopy(
     versionId: string,
@@ -165,6 +169,8 @@ export interface IArticleService {
     filters: FilterArticleInput,
     clientSharedId: string,
     topicId?: string,
+    /** Present on the internal staff route; scopes to the user's clients. */
+    userId?: string,
   ): Promise<ExternalClientArticle[]>;
 
   getArticleByExternalClientAndArticleId(

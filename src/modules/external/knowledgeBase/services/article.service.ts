@@ -37,6 +37,7 @@ import { generateArticleSynopsis } from '../../../../shared/utils/ai.service';
 import { ARTICLE_LOCK_DURATION_MS } from '../kb.constants';
 import { ArticleChunkingService } from './articleChunking.service';
 import { ArticleSearchService } from './articleSearch.service';
+import { KbAccessService } from './kbAccess.service';
 
 const KB_PERM_VIEW_METADATA = 'kb:article:view:metadata';
 
@@ -57,7 +58,19 @@ export class ArticleService implements IArticleService {
     private chunkingService: ArticleChunkingService,
     @inject(TYPES.IArticleSearchService)
     private searchService: ArticleSearchService,
+    @inject(TYPES.IKbAccessService)
+    private kbAccess: KbAccessService,
   ) {}
+
+  /** Asserts the user may read the client that owns this article version. */
+  private async assertVersionAccess(
+    userId: string,
+    versionId: string,
+  ): Promise<void> {
+    const view = await this.articleRepository.findByVersionId(versionId);
+    if (!view) throw new NotFoundError('Article', versionId);
+    await this.kbAccess.assertTopicAccess(userId, view.topic_id);
+  }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -100,9 +113,13 @@ export class ArticleService implements IArticleService {
 
   // ─── Client copy (dual view) ───────────────────────────────────────────────────
 
-  async getArticleClientCopy(versionId: string): Promise<KbClientCopyView> {
+  async getArticleClientCopy(
+    versionId: string,
+    userId: string,
+  ): Promise<KbClientCopyView> {
     const version = await this.articleRepository.findByVersionId(versionId);
     if (!version) throw new NotFoundError('Article', versionId);
+    await this.kbAccess.assertTopicAccess(userId, version.topic_id);
     const copy = await this.articleRepository.getClientCopyByArticleId(version.article_id);
     if (!copy) throw new NotFoundError('Client copy', versionId);
     return copy;
@@ -311,7 +328,11 @@ export class ArticleService implements IArticleService {
 
   // ─── Queries ──────────────────────────────────────────────────────────────────
 
-  async getArticles(topicId: string): Promise<KbArticleVersionView[]> {
+  async getArticles(
+    topicId: string,
+    userId: string,
+  ): Promise<KbArticleVersionView[]> {
+    await this.kbAccess.assertTopicAccess(userId, topicId);
     return this.articleRepository.findAllLatestByTopicId(topicId);
   }
 
@@ -332,7 +353,13 @@ export class ArticleService implements IArticleService {
     userId: string,
   ): Promise<PaginatedArticlesResult> {
     const canSeeDraft = await this.getCanSeeDraft(userId);
-    return this.articleRepository.findAndCount(filters, canSeeDraft);
+    // Scope the general list to the clients granted to this user
+    // (user_clients); KB managers (kb:client:manage) see everything.
+    const topicIds = await this.kbAccess.accessibleTopicIds(userId);
+    if (topicIds === null) {
+      return this.articleRepository.findAndCount(filters, canSeeDraft);
+    }
+    return this.articleRepository.findAndCountByTopicIds(topicIds, filters, canSeeDraft);
   }
 
   async findArticlesByClientId(
@@ -340,6 +367,7 @@ export class ArticleService implements IArticleService {
     filters: FilterArticleInput,
     userId: string,
   ): Promise<PaginatedArticlesResult> {
+    await this.kbAccess.assertClientAccess(userId, clientId);
     const canSeeDraft = await this.getCanSeeDraft(userId);
 
     const topics = await this.topicRepository.findAllByClientId(clientId);
@@ -354,6 +382,7 @@ export class ArticleService implements IArticleService {
     filters: FilterArticleInput,
     userId: string,
   ): Promise<PaginatedArticlesResult> {
+    await this.kbAccess.assertTopicAccess(userId, topicId);
     const canSeeDraft = await this.getCanSeeDraft(userId);
     return this.articleRepository.findAndCountByTopicId(topicId, filters, canSeeDraft);
   }
@@ -364,7 +393,7 @@ export class ArticleService implements IArticleService {
     return article;
   }
 
-  async getArticleWithDetails(versionId: string): Promise<{
+  async getArticleWithDetails(versionId: string, userId: string): Promise<{
     article: {
       article_version_id: string;
       article_name: string;
@@ -388,6 +417,7 @@ export class ArticleService implements IArticleService {
   }> {
     const view = await this.articleRepository.findByVersionId(versionId);
     if (!view) throw new NotFoundError('Article', versionId);
+    await this.kbAccess.assertTopicAccess(userId, view.topic_id);
 
     const [tags, topic, creator, updater, publisher] = await Promise.all([
       this.tagRepository.findByIds(view.tag_ids),
@@ -427,9 +457,13 @@ export class ArticleService implements IArticleService {
     };
   }
 
-  async getArticleDocumentById(versionId: string): Promise<string> {
+  async getArticleDocumentById(
+    versionId: string,
+    userId: string,
+  ): Promise<string> {
     const article = await this.articleRepository.findByVersionId(versionId);
     if (!article) throw new NotFoundError('Article', versionId);
+    await this.kbAccess.assertTopicAccess(userId, article.topic_id);
     return article.content;
   }
 
@@ -446,7 +480,9 @@ export class ArticleService implements IArticleService {
 
   async getArticleVersionsByArticleVersionId(
     versionId: string,
+    userId: string,
   ): Promise<KbArticleVersionView[]> {
+    await this.assertVersionAccess(userId, versionId);
     const versions = await this.articleRepository.findVersionsByVersionId(versionId);
     if (versions.length === 0) throw new BusinessLogicError('No versions found.');
     return versions;
@@ -700,7 +736,15 @@ export class ArticleService implements IArticleService {
     filters: FilterArticleInput,
     clientSharedId: string,
     topicId?: string,
+    userId?: string,
   ): Promise<ExternalClientArticle[]> {
+    // `userId` is present only on the internal (staff JWT) route — scope it.
+    // API-key (portal) calls pass no user; the portal enforces its own scoping.
+    if (userId) {
+      const client = await this.clientRepository.findBySharedId(clientSharedId);
+      if (!client) throw new NotFoundError('Client', clientSharedId);
+      await this.kbAccess.assertClientAccess(userId, client.client_id);
+    }
     const topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, topicId);
     if (topicIds.length === 0) return [];
 
