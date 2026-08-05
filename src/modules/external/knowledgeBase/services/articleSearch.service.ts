@@ -66,6 +66,10 @@ const DEFAULT_LIMIT = 20;
 const VECTOR_TOP_K = 50;
 const TEXT_TOP_K = 50;
 const PREVIEW_LENGTH = 280;
+// UAT CQ-23: without a similarity floor, nonsense queries returned the nearest
+// neighbors instead of an empty state. Vector hits below this cosine floor are
+// dropped (text-index hits are unaffected). Tunable via env without a rebuild.
+const MIN_VECTOR_SIMILARITY = Number(process.env['KB_SEARCH_MIN_SIMILARITY'] ?? '0.45');
 
 @injectable()
 export class ArticleSearchService {
@@ -183,10 +187,17 @@ export class ArticleSearchService {
 
     scored.sort((a, b) => b.similarity - a.similarity);
 
+    const topSimilarity = scored[0]?.similarity ?? 0;
+    const relevant = scored.filter((s) => s.similarity >= MIN_VECTOR_SIMILARITY);
+    logger.info(
+      `[search] q="${query.slice(0, 60)}" audience=${audience} topSim=${topSimilarity.toFixed(3)} ` +
+        `kept=${relevant.length}/${scored.length} (floor=${MIN_VECTOR_SIMILARITY})`,
+    );
+
     // Collapse to best chunk per version_id, then take top K.
     const seen = new Set<string>();
     const best: typeof scored = [];
-    for (const s of scored) {
+    for (const s of relevant) {
       if (seen.has(s.version_id)) continue;
       seen.add(s.version_id);
       best.push(s);
