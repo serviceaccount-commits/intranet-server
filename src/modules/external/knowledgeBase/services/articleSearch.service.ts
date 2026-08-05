@@ -66,10 +66,14 @@ const DEFAULT_LIMIT = 20;
 const VECTOR_TOP_K = 50;
 const TEXT_TOP_K = 50;
 const PREVIEW_LENGTH = 280;
-// UAT CQ-23: without a similarity floor, nonsense queries returned the nearest
-// neighbors instead of an empty state. Vector hits below this cosine floor are
-// dropped (text-index hits are unaffected). Tunable via env without a rebuild.
+// UAT CQ-23: without a relevance gate, nonsense queries returned the nearest
+// neighbors instead of an empty state. Absolute cosine floors don't separate
+// the two in this embedding space (gibberish tops ~0.66 vs real terms ~0.72),
+// so the gate is CONTRAST: a real query has chunks that stand out from the
+// corpus mean; gibberish scores flat. Both knobs are env-tunable (pm2 restart,
+// no rebuild). Text-index hits are unaffected.
 const MIN_VECTOR_SIMILARITY = Number(process.env['KB_SEARCH_MIN_SIMILARITY'] ?? '0.45');
+const MIN_VECTOR_CONTRAST = Number(process.env['KB_SEARCH_MIN_CONTRAST'] ?? '2.5');
 
 @injectable()
 export class ArticleSearchService {
@@ -188,11 +192,19 @@ export class ArticleSearchService {
     scored.sort((a, b) => b.similarity - a.similarity);
 
     const topSimilarity = scored[0]?.similarity ?? 0;
-    const relevant = scored.filter((s) => s.similarity >= MIN_VECTOR_SIMILARITY);
+    const mean = scored.reduce((sum, s) => sum + s.similarity, 0) / scored.length;
+    const variance = scored.reduce((sum, s) => sum + (s.similarity - mean) ** 2, 0) / scored.length;
+    const std = Math.sqrt(variance);
+    const contrast = std > 0 ? (topSimilarity - mean) / std : 0;
+    const passesGate = topSimilarity >= MIN_VECTOR_SIMILARITY && contrast >= MIN_VECTOR_CONTRAST;
     logger.info(
       `[search] q="${query.slice(0, 60)}" audience=${audience} topSim=${topSimilarity.toFixed(3)} ` +
-        `kept=${relevant.length}/${scored.length} (floor=${MIN_VECTOR_SIMILARITY})`,
+        `mean=${mean.toFixed(3)} std=${std.toFixed(3)} contrast=${contrast.toFixed(2)} ` +
+        `gate=${passesGate ? 'PASS' : 'EMPTY'} (floor=${MIN_VECTOR_SIMILARITY}, minContrast=${MIN_VECTOR_CONTRAST})`,
     );
+    if (!passesGate) return [];
+
+    const relevant = scored.filter((s) => s.similarity >= MIN_VECTOR_SIMILARITY);
 
     // Collapse to best chunk per version_id, then take top K.
     const seen = new Set<string>();
