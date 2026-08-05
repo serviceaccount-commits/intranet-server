@@ -67,13 +67,16 @@ const VECTOR_TOP_K = 50;
 const TEXT_TOP_K = 50;
 const PREVIEW_LENGTH = 280;
 // UAT CQ-23: without a relevance gate, nonsense queries returned the nearest
-// neighbors instead of an empty state. Absolute cosine floors don't separate
-// the two in this embedding space (gibberish tops ~0.66 vs real terms ~0.72),
-// so the gate is CONTRAST: a real query has chunks that stand out from the
-// corpus mean; gibberish scores flat. Both knobs are env-tunable (pm2 restart,
-// no rebuild). Text-index hits are unaffected.
+// neighbors instead of an empty state. Two signals separate them cleanly in
+// this embedding space (measured in prod, 788 chunks): real queries reach
+// topSim >= ~0.715 while gibberish caps at ~0.674, AND real queries spread
+// the corpus (std >= ~0.030) while gibberish scores flat (std <= ~0.018).
+// A query passes if EITHER signal clears its knob (lenient on purpose — a
+// z-score/contrast gate was tried first and misclassified generic real terms).
+// All knobs env-tunable (pm2 restart, no rebuild). Text-index hits unaffected.
 const MIN_VECTOR_SIMILARITY = Number(process.env['KB_SEARCH_MIN_SIMILARITY'] ?? '0.45');
-const MIN_VECTOR_CONTRAST = Number(process.env['KB_SEARCH_MIN_CONTRAST'] ?? '2.5');
+const MIN_TOP_SIMILARITY = Number(process.env['KB_SEARCH_MIN_TOP_SIM'] ?? '0.695');
+const MIN_SIMILARITY_STD = Number(process.env['KB_SEARCH_MIN_STD'] ?? '0.025');
 
 @injectable()
 export class ArticleSearchService {
@@ -195,12 +198,11 @@ export class ArticleSearchService {
     const mean = scored.reduce((sum, s) => sum + s.similarity, 0) / scored.length;
     const variance = scored.reduce((sum, s) => sum + (s.similarity - mean) ** 2, 0) / scored.length;
     const std = Math.sqrt(variance);
-    const contrast = std > 0 ? (topSimilarity - mean) / std : 0;
-    const passesGate = topSimilarity >= MIN_VECTOR_SIMILARITY && contrast >= MIN_VECTOR_CONTRAST;
+    const passesGate = topSimilarity >= MIN_TOP_SIMILARITY || std >= MIN_SIMILARITY_STD;
     logger.info(
       `[search] q="${query.slice(0, 60)}" audience=${audience} topSim=${topSimilarity.toFixed(3)} ` +
-        `mean=${mean.toFixed(3)} std=${std.toFixed(3)} contrast=${contrast.toFixed(2)} ` +
-        `gate=${passesGate ? 'PASS' : 'EMPTY'} (floor=${MIN_VECTOR_SIMILARITY}, minContrast=${MIN_VECTOR_CONTRAST})`,
+        `mean=${mean.toFixed(3)} std=${std.toFixed(3)} ` +
+        `gate=${passesGate ? 'PASS' : 'EMPTY'} (minTopSim=${MIN_TOP_SIMILARITY}, minStd=${MIN_SIMILARITY_STD})`,
     );
     if (!passesGate) return [];
 
