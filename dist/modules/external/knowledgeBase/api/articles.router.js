@@ -111,6 +111,22 @@ articlesRouter.put('/publish-versions', async (req, res, next) => {
         next(error);
     }
 });
+articlesRouter.put('/archive-versions', async (req, res, next) => {
+    try {
+        await articleController.archiveVersions(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+articlesRouter.put('/restore-versions', async (req, res, next) => {
+    try {
+        await articleController.restoreVersions(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 articlesRouter.put('/:articleId/publish', async (req, res, next) => {
     try {
         await articleController.publishVersion(req, res);

@@ -72,8 +72,11 @@ export class ArticleRepository implements IArticleRepository {
   ) {
     const { tagId } = filters;
 
-    const allowedStatuses: ArticleStatus[] = ['published', 'unpublished', 'outdated', 'archived'];
-    if (canSeeDraft) allowedStatuses.push('draft');
+    const allowedStatuses: ArticleStatus[] =
+      filters.view === 'archived'
+        ? ['archived']
+        : ['published', 'unpublished', 'outdated'];
+    if (canSeeDraft && filters.view !== 'archived') allowedStatuses.push('draft');
 
     const stages: Record<string, unknown>[] = [
       { $unwind: '$versions' },
@@ -551,6 +554,57 @@ export class ArticleRepository implements IArticleRepository {
         },
       },
       { arrayFilters: [{ 'elem._id': { $in: oids } }] },
+    );
+  }
+
+  async archiveArticlesByIds(articleIds: string[]): Promise<void> {
+    const oids = articleIds
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    if (oids.length === 0) return;
+
+    const now = new Date();
+    // Whole-article operation: every version goes to 'archived' and the client
+    // copy is hidden from the portal in the same write.
+    await this.col.updateMany(
+      { _id: { $in: oids } },
+      {
+        $set: {
+          'versions.$[].article_status': 'archived',
+          'versions.$[].updatedAt': now,
+          available_for_client: false,
+          updatedAt: now,
+        },
+      },
+    );
+  }
+
+  async restoreArticleById(articleId: string, latestVersionId: string): Promise<void> {
+    if (!ObjectId.isValid(articleId) || !ObjectId.isValid(latestVersionId)) {
+      throw new NotFoundError('Article', articleId);
+    }
+    const latestOid = new ObjectId(latestVersionId);
+    const now = new Date();
+    // Pre-archive statuses are not preserved: the newest version comes back
+    // as 'unpublished' (never straight to the portal) and the rest as
+    // 'outdated', the same shape the normal lifecycle produces.
+    await this.col.updateOne(
+      { _id: new ObjectId(articleId) },
+      {
+        $set: {
+          'versions.$[latest].article_status': 'unpublished',
+          'versions.$[latest].updatedAt': now,
+          'versions.$[old].article_status': 'outdated',
+          'versions.$[old].updatedAt': now,
+          updatedAt: now,
+        },
+      },
+      {
+        arrayFilters: [
+          { 'latest._id': latestOid },
+          { 'old._id': { $ne: latestOid } },
+        ],
+      },
     );
   }
 

@@ -85,6 +85,8 @@ export interface IArticleRepository {
   ): Promise<void>;
 
   updateVersionsStatus(versionIds: string[], status: ArticleStatus): Promise<void>;
+  archiveArticlesByIds(articleIds: string[]): Promise<void>;
+  restoreArticleById(articleId: string, latestVersionId: string): Promise<void>;
 
   /** Sets the root-level available_for_client flag on the article containing versionId. */
   setAvailableForClient(versionId: string, available: boolean): Promise<void>;

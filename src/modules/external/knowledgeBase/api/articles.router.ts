@@ -148,6 +148,28 @@ articlesRouter.put(
     }
   },
 );
+
+articlesRouter.put(
+  '/archive-versions',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await articleController.archiveVersions(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+articlesRouter.put(
+  '/restore-versions',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await articleController.restoreVersions(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 articlesRouter.put(
   '/:articleId/publish',
   async (req: Request, res: Response, next: NextFunction) => {

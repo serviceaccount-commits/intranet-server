@@ -83,6 +83,15 @@ let ArticleChunkingService = class ArticleChunkingService {
     }
     /** Wrapper for consumers (article create/update flows) that should never
      *  fail the parent operation if chunking fails. Errors are logged. */
+    /** Removes every chunk of the article — all versions AND the client copy,
+     *  both audiences. Used on archive so neither intranet nor portal search can
+     *  surface the content; embeddings re-generate from the hash cache if the
+     *  article is later restored and re-chunked. */
+    async clearArticle(articleId) {
+        if (!mongodb_1.ObjectId.isValid(articleId))
+            return 0;
+        return this.chunkRepository.deleteByArticleId(new mongodb_1.ObjectId(articleId));
+    }
     async processVersionSafe(articleId, versionId, html, audience = 'internal') {
         try {
             const result = await this.processVersion(articleId, versionId, html, audience);

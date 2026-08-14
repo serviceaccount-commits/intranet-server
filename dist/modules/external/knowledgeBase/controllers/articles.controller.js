@@ -387,6 +387,42 @@ let ArticleController = class ArticleController {
             res.status(400).json({ error });
         }
     }
+    async archiveVersions(req, res) {
+        const { articleIds } = req.body;
+        const userId = req.user?.id;
+        if (!articleIds || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            await this.articleService.archiveArticles(articleIds);
+            res.sendStatus(200);
+        }
+        catch (error) {
+            if (error instanceof BusinessLogicError_1.BusinessLogicError) {
+                return res.status(403).json({ message: error.message });
+            }
+            res.status(400).json({ error });
+        }
+    }
+    async restoreVersions(req, res) {
+        const { articleIds } = req.body;
+        const userId = req.user?.id;
+        if (!articleIds || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            await this.articleService.restoreArticles(articleIds);
+            res.sendStatus(200);
+        }
+        catch (error) {
+            if (error instanceof BusinessLogicError_1.BusinessLogicError) {
+                return res.status(403).json({ message: error.message });
+            }
+            res.status(400).json({ error });
+        }
+    }
     async closeArticleEdit(req, res) {
         const { articleId } = req.params;
         const userId = req.user?.id;

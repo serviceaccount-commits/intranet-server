@@ -22,6 +22,10 @@ export const FilterArticleSchema = z.object({
 
   sortBy: z.enum(ARTICLE_SORT_FIELDS).optional(),
   sortDir: z.enum(['asc', 'desc']).optional().default('desc'),
+
+  // 'active' (default) hides archived versions from every list; 'archived'
+  // shows ONLY archived ones (the dashboard's "Archived" view).
+  view: z.enum(['active', 'archived']).optional().default('active'),
 });
 
 export type ArticleSortField = (typeof ARTICLE_SORT_FIELDS)[number];

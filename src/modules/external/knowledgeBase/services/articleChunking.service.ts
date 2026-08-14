@@ -93,6 +93,15 @@ export class ArticleChunkingService {
 
   /** Wrapper for consumers (article create/update flows) that should never
    *  fail the parent operation if chunking fails. Errors are logged. */
+  /** Removes every chunk of the article — all versions AND the client copy,
+   *  both audiences. Used on archive so neither intranet nor portal search can
+   *  surface the content; embeddings re-generate from the hash cache if the
+   *  article is later restored and re-chunked. */
+  async clearArticle(articleId: string): Promise<number> {
+    if (!ObjectId.isValid(articleId)) return 0;
+    return this.chunkRepository.deleteByArticleId(new ObjectId(articleId));
+  }
+
   async processVersionSafe(
     articleId: string,
     versionId: string,

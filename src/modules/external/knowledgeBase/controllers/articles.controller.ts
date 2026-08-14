@@ -436,6 +436,46 @@ export class ArticleController {
     }
   }
 
+  async archiveVersions(req: Request, res: Response) {
+    const { articleIds } = req.body;
+    const userId = req.user?.id;
+
+    if (!articleIds || !userId) {
+      res.sendStatus(400);
+      return;
+    }
+
+    try {
+      await this.articleService.archiveArticles(articleIds as string[]);
+      res.sendStatus(200);
+    } catch (error) {
+      if (error instanceof BusinessLogicError) {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(400).json({ error });
+    }
+  }
+
+  async restoreVersions(req: Request, res: Response) {
+    const { articleIds } = req.body;
+    const userId = req.user?.id;
+
+    if (!articleIds || !userId) {
+      res.sendStatus(400);
+      return;
+    }
+
+    try {
+      await this.articleService.restoreArticles(articleIds as string[]);
+      res.sendStatus(200);
+    } catch (error) {
+      if (error instanceof BusinessLogicError) {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(400).json({ error });
+    }
+  }
+
   async closeArticleEdit(req: Request, res: Response) {
     const { articleId } = req.params;
     const userId = req.user?.id;

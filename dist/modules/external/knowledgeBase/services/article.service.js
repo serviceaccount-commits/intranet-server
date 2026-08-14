@@ -449,6 +449,48 @@ let ArticleService = class ArticleService {
         }
         await this.articleRepository.updateVersionsStatus(versionIds, 'unpublished');
     }
+    /** Archives the WHOLE article owning each given version (any status): every
+     *  version → 'archived', hidden from the portal, and all chunks wiped so no
+     *  search path (internal or client) can surface the content. Reversible via
+     *  restoreArticles. */
+    async archiveArticles(versionIds) {
+        const versions = await this.articleRepository.findByVersionIds(versionIds);
+        if (versions.length === 0)
+            throw new BusinessLogicError_1.BusinessLogicError('No versions found.');
+        const articleIds = [...new Set(versions.map((v) => v.article_id))];
+        await this.articleRepository.archiveArticlesByIds(articleIds);
+        for (const articleId of articleIds) {
+            await this.chunkingService.clearArticle(articleId);
+        }
+    }
+    /** Restores archived articles: newest version comes back as 'unpublished'
+     *  (never straight to the portal), older ones as 'outdated'. Re-chunks the
+     *  restored version for the internal index; the client copy stays
+     *  unavailable/unchunked until staff re-enables it. */
+    async restoreArticles(versionIds) {
+        const versions = await this.articleRepository.findByVersionIds(versionIds);
+        if (versions.length === 0)
+            throw new BusinessLogicError_1.BusinessLogicError('No versions found.');
+        const versionByArticle = new Map();
+        for (const v of versions) {
+            if (!versionByArticle.has(v.article_id)) {
+                versionByArticle.set(v.article_id, v.article_version_id);
+            }
+        }
+        for (const [articleId, anyVersionId] of versionByArticle) {
+            const all = await this.articleRepository.findVersionsByVersionId(anyVersionId);
+            if (all.length === 0)
+                continue;
+            if (all.some((v) => v.article_status !== 'archived')) {
+                throw new BusinessLogicError_1.BusinessLogicError(`Article "${all[0]?.article_name ?? articleId}" is not archived.`);
+            }
+            const latest = all.reduce((max, v) => (v.version > max.version ? v : max));
+            await this.articleRepository.restoreArticleById(articleId, latest.article_version_id);
+            // S3-stored content re-chunks on the next save; inline content re-indexes
+            // right away.
+            await this.chunkingService.processVersionSafe(articleId, latest.article_version_id, latest.content ?? '', 'internal');
+        }
+    }
     // ─── External client portal ───────────────────────────────────────────────────
     /** Resolves clientSharedId → client → topics, then delegates to the repo.
      *  Optional `topicId` narrows the result to that single topic (validated to

@@ -128,6 +128,8 @@ export interface IArticleService {
   unpublishVersion(versionId: string): Promise<KbArticleVersionView>;
   publishVersions(versionIds: string[]): Promise<void>;
   unpublishVersions(versionIds: string[]): Promise<void>;
+  archiveArticles(versionIds: string[]): Promise<void>;
+  restoreArticles(versionIds: string[]): Promise<void>;
 
   /** Persists the "available for client" flag that gates external/portal visibility. */
   setArticleAvailability(

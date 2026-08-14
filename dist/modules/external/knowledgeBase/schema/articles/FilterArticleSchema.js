@@ -21,5 +21,8 @@ exports.FilterArticleSchema = zod_1.z.object({
     limit: zod_1.z.coerce.number().int().optional().default(20),
     sortBy: zod_1.z.enum(exports.ARTICLE_SORT_FIELDS).optional(),
     sortDir: zod_1.z.enum(['asc', 'desc']).optional().default('desc'),
+    // 'active' (default) hides archived versions from every list; 'archived'
+    // shows ONLY archived ones (the dashboard's "Archived" view).
+    view: zod_1.z.enum(['active', 'archived']).optional().default('active'),
 });
 //# sourceMappingURL=FilterArticleSchema.js.map

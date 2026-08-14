@@ -87,8 +87,10 @@ let ArticleRepository = class ArticleRepository {
      *  Text search stage (if any) must be added BEFORE calling this. */
     buildVersionFilterStages(filters, canSeeDraft, forceStatus) {
         const { tagId } = filters;
-        const allowedStatuses = ['published', 'unpublished', 'outdated', 'archived'];
-        if (canSeeDraft)
+        const allowedStatuses = filters.view === 'archived'
+            ? ['archived']
+            : ['published', 'unpublished', 'outdated'];
+        if (canSeeDraft && filters.view !== 'archived')
             allowedStatuses.push('draft');
         const stages = [
             { $unwind: '$versions' },
@@ -467,6 +469,48 @@ let ArticleRepository = class ArticleRepository {
                 updatedAt: now,
             },
         }, { arrayFilters: [{ 'elem._id': { $in: oids } }] });
+    }
+    async archiveArticlesByIds(articleIds) {
+        const oids = articleIds
+            .filter((id) => mongodb_1.ObjectId.isValid(id))
+            .map((id) => new mongodb_1.ObjectId(id));
+        if (oids.length === 0)
+            return;
+        const now = new Date();
+        // Whole-article operation: every version goes to 'archived' and the client
+        // copy is hidden from the portal in the same write.
+        await this.col.updateMany({ _id: { $in: oids } }, {
+            $set: {
+                'versions.$[].article_status': 'archived',
+                'versions.$[].updatedAt': now,
+                available_for_client: false,
+                updatedAt: now,
+            },
+        });
+    }
+    async restoreArticleById(articleId, latestVersionId) {
+        if (!mongodb_1.ObjectId.isValid(articleId) || !mongodb_1.ObjectId.isValid(latestVersionId)) {
+            throw new NotFoundError_1.NotFoundError('Article', articleId);
+        }
+        const latestOid = new mongodb_1.ObjectId(latestVersionId);
+        const now = new Date();
+        // Pre-archive statuses are not preserved: the newest version comes back
+        // as 'unpublished' (never straight to the portal) and the rest as
+        // 'outdated', the same shape the normal lifecycle produces.
+        await this.col.updateOne({ _id: new mongodb_1.ObjectId(articleId) }, {
+            $set: {
+                'versions.$[latest].article_status': 'unpublished',
+                'versions.$[latest].updatedAt': now,
+                'versions.$[old].article_status': 'outdated',
+                'versions.$[old].updatedAt': now,
+                updatedAt: now,
+            },
+        }, {
+            arrayFilters: [
+                { 'latest._id': latestOid },
+                { 'old._id': { $ne: latestOid } },
+            ],
+        });
     }
     async setAvailableForClient(versionId, available) {
         if (!mongodb_1.ObjectId.isValid(versionId))
