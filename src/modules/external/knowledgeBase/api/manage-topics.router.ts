@@ -30,4 +30,15 @@ manageTopicsRouter.put(
   },
 );
 
+manageTopicsRouter.delete(
+  '/:clientSharedId/:topicId',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await manageTopicsController.deleteTopic(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 export { manageTopicsRouter };

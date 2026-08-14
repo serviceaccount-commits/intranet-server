@@ -2,12 +2,14 @@ import { inject, injectable } from 'inversify';
 import { TYPES } from '../../../../shared/config/containerTypes';
 import { ITopicService } from '../interfaces/topics/topic.service.interface';
 import { ITopicRepository } from '../interfaces/topics/topic.repository.interface';
+import { IArticleRepository } from '../interfaces/articles/article.repository.interface';
 import { IClientRepository } from '../interfaces/clients/client.repository.interface';
 import { IUserRepository } from '../../../internal/users/interfaces/users/user.repository.interface';
 import { KbTopic } from '../database/kb-domain.types';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
 import { AuthenticationError } from '../../../../shared/errors/AuthenticationError';
 import { ValidationError } from '../../../../shared/errors/ValidationError';
+import { BusinessLogicError } from '../../../../shared/errors/BusinessLogicError';
 import { CreateTopicInput, CreateTopicSchema } from '../schema/topics/CreateTopicSchema';
 import { UpdateTopicInput, UpdateTopicSchema } from '../schema/topics/UpdateTopicSchema';
 import {
@@ -23,6 +25,8 @@ export class TopicService implements ITopicService {
   constructor(
     @inject(TYPES.ITopicRepository)
     private topicRepository: ITopicRepository,
+    @inject(TYPES.IArticleRepository)
+    private articleRepository: IArticleRepository,
     @inject(TYPES.IClientRepository)
     private clientRepository: IClientRepository,
     @inject(TYPES.IUserRepository)
@@ -172,6 +176,40 @@ export class TopicService implements ITopicService {
         parentTopicId: data.parentTopicId ?? null,
       }),
     });
+  }
+
+  /**
+   * Delete a folder on behalf of a portal user. Only EMPTY folders are
+   * deletable — no subfolders and no articles (any status) — so a portal
+   * click can never orphan or drop real client content.
+   */
+  async deleteManagedTopic(
+    clientSharedId: string,
+    topicId: string,
+  ): Promise<void> {
+    const client = await this.clientRepository.findBySharedId(clientSharedId);
+    if (!client) throw new NotFoundError('Client', clientSharedId);
+
+    const topic = await this.topicRepository.findById(topicId);
+    if (!topic || topic.client_id !== client.client_id) {
+      throw new NotFoundError('Topic', topicId);
+    }
+
+    const descendantIds = await this.topicRepository.findAllDescendantIds(topicId);
+    if (descendantIds.length > 0) {
+      throw new BusinessLogicError(
+        'The folder has subfolders. Move or delete them first.',
+      );
+    }
+
+    const articles = await this.articleRepository.findAllLatestByTopicId(topicId);
+    if (articles.length > 0) {
+      throw new BusinessLogicError(
+        'The folder contains articles. Move or delete them first.',
+      );
+    }
+
+    await this.topicRepository.deleteById(topicId);
   }
 
   async getTopics(clientId: string, userId: string): Promise<KbTopic[]> {

@@ -18,6 +18,7 @@ export interface ITopicService {
     topicId: string,
     input: UpdateManagedTopicInput,
   ): Promise<KbTopic>;
+  deleteManagedTopic(clientSharedId: string, topicId: string): Promise<void>;
   getTopics(clientId: string, userId: string): Promise<KbTopic[]>;
   getTopicById(topicId: string, userId: string): Promise<KbTopic>;
 }

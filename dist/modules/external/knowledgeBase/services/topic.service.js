@@ -18,17 +18,20 @@ const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 const AuthenticationError_1 = require("../../../../shared/errors/AuthenticationError");
 const ValidationError_1 = require("../../../../shared/errors/ValidationError");
+const BusinessLogicError_1 = require("../../../../shared/errors/BusinessLogicError");
 const CreateTopicSchema_1 = require("../schema/topics/CreateTopicSchema");
 const UpdateTopicSchema_1 = require("../schema/topics/UpdateTopicSchema");
 const ManagedTopicSchemas_1 = require("../schema/manage/ManagedTopicSchemas");
 const kbAccess_service_1 = require("./kbAccess.service");
 let TopicService = class TopicService {
     topicRepository;
+    articleRepository;
     clientRepository;
     userRepository;
     kbAccess;
-    constructor(topicRepository, clientRepository, userRepository, kbAccess) {
+    constructor(topicRepository, articleRepository, clientRepository, userRepository, kbAccess) {
         this.topicRepository = topicRepository;
+        this.articleRepository = articleRepository;
         this.clientRepository = clientRepository;
         this.userRepository = userRepository;
         this.kbAccess = kbAccess;
@@ -146,6 +149,29 @@ let TopicService = class TopicService {
             }),
         });
     }
+    /**
+     * Delete a folder on behalf of a portal user. Only EMPTY folders are
+     * deletable — no subfolders and no articles (any status) — so a portal
+     * click can never orphan or drop real client content.
+     */
+    async deleteManagedTopic(clientSharedId, topicId) {
+        const client = await this.clientRepository.findBySharedId(clientSharedId);
+        if (!client)
+            throw new NotFoundError_1.NotFoundError('Client', clientSharedId);
+        const topic = await this.topicRepository.findById(topicId);
+        if (!topic || topic.client_id !== client.client_id) {
+            throw new NotFoundError_1.NotFoundError('Topic', topicId);
+        }
+        const descendantIds = await this.topicRepository.findAllDescendantIds(topicId);
+        if (descendantIds.length > 0) {
+            throw new BusinessLogicError_1.BusinessLogicError('The folder has subfolders. Move or delete them first.');
+        }
+        const articles = await this.articleRepository.findAllLatestByTopicId(topicId);
+        if (articles.length > 0) {
+            throw new BusinessLogicError_1.BusinessLogicError('The folder contains articles. Move or delete them first.');
+        }
+        await this.topicRepository.deleteById(topicId);
+    }
     async getTopics(clientId, userId) {
         await this.kbAccess.assertClientAccess(userId, clientId);
         return this.topicRepository.findAllByClientId(clientId);
@@ -162,9 +188,10 @@ exports.TopicService = TopicService;
 exports.TopicService = TopicService = __decorate([
     (0, inversify_1.injectable)(),
     __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.ITopicRepository)),
-    __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IClientRepository)),
-    __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserRepository)),
-    __param(3, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbAccessService)),
-    __metadata("design:paramtypes", [Object, Object, Object, kbAccess_service_1.KbAccessService])
+    __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleRepository)),
+    __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IClientRepository)),
+    __param(3, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserRepository)),
+    __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbAccessService)),
+    __metadata("design:paramtypes", [Object, Object, Object, Object, kbAccess_service_1.KbAccessService])
 ], TopicService);
 //# sourceMappingURL=topic.service.js.map

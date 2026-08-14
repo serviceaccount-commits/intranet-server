@@ -42,6 +42,9 @@ let TopicRepository = class TopicRepository {
     async save(topic) {
         return this.repo.save(topic);
     }
+    async deleteById(id) {
+        await this.repo.delete({ topic_id: id });
+    }
     /** Returns every topic_id under the given root (root NOT included), walking
      *  the parent_topic_id self-reference recursively. Used to validate cycles
      *  and to power "include subfolders" reads. */

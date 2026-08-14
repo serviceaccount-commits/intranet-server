@@ -55,6 +55,20 @@ export class ManageTopicsController {
     }
   }
 
+  async deleteTopic(req: Request, res: Response) {
+    const { clientSharedId, topicId } = req.params;
+    if (!clientSharedId || !topicId) {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      await this.topicService.deleteManagedTopic(clientSharedId, topicId);
+      res.sendStatus(204);
+    } catch (error) {
+      this.handleError(error, res);
+    }
+  }
+
   private handleError(error: unknown, res: Response) {
     if (error instanceof NotFoundError) {
       res.status(404).json({ message: error.message });

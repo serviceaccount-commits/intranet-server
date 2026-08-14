@@ -58,6 +58,20 @@ let ManageTopicsController = class ManageTopicsController {
             this.handleError(error, res);
         }
     }
+    async deleteTopic(req, res) {
+        const { clientSharedId, topicId } = req.params;
+        if (!clientSharedId || !topicId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            await this.topicService.deleteManagedTopic(clientSharedId, topicId);
+            res.sendStatus(204);
+        }
+        catch (error) {
+            this.handleError(error, res);
+        }
+    }
     handleError(error, res) {
         if (error instanceof NotFoundError_1.NotFoundError) {
             res.status(404).json({ message: error.message });

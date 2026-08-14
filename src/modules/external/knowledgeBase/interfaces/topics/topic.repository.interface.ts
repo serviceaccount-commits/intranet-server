@@ -8,6 +8,7 @@ export interface ITopicRepository {
   findById(id: string): Promise<KbTopic | null>;
   findByName(name: string): Promise<KbTopic | null>;
   save(topic: KbTopic): Promise<KbTopic>;
+  deleteById(id: string): Promise<void>;
   /** Returns descendants only (excludes the root). */
   findAllDescendantIds(rootTopicId: string): Promise<string[]>;
 }

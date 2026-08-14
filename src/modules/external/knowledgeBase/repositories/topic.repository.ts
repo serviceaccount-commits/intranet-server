@@ -45,6 +45,10 @@ export class TopicRepository implements ITopicRepository {
     return this.repo.save(topic as Topic) as Promise<KbTopic>;
   }
 
+  async deleteById(id: string): Promise<void> {
+    await this.repo.delete({ topic_id: id });
+  }
+
   /** Returns every topic_id under the given root (root NOT included), walking
    *  the parent_topic_id self-reference recursively. Used to validate cycles
    *  and to power "include subfolders" reads. */

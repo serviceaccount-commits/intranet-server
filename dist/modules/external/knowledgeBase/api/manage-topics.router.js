@@ -23,4 +23,12 @@ manageTopicsRouter.put('/:clientSharedId/:topicId', async (req, res, next) => {
         next(error);
     }
 });
+manageTopicsRouter.delete('/:clientSharedId/:topicId', async (req, res, next) => {
+    try {
+        await manageTopicsController.deleteTopic(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 //# sourceMappingURL=manage-topics.router.js.map
