@@ -22,6 +22,7 @@ const ConflictError_1 = require("../../../../shared/errors/ConflictError");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 const BusinessLogicError_1 = require("../../../../shared/errors/BusinessLogicError");
 const CreateClientSchema_1 = require("../schema/clients/CreateClientSchema");
+const UpdateClientSchema_1 = require("../schema/clients/UpdateClientSchema");
 const ES_1 = __importDefault(require("../../../../shared/types/enum/ES"));
 const REGION_1 = __importDefault(require("../../../../shared/types/enum/REGION"));
 let ClientService = class ClientService {
@@ -79,10 +80,34 @@ let ClientService = class ClientService {
         return client;
     }
     async updateClient(input) {
-        const client = await this.clientRepository.findById(input.clientId);
+        const data = UpdateClientSchema_1.UpdateClientSchema.parse(input);
+        const client = await this.clientRepository.findById(data.clientId);
         if (!client)
-            throw new NotFoundError_1.NotFoundError('Client', input.clientId);
-        client.client_name = input.clientName;
+            throw new NotFoundError_1.NotFoundError('Client', data.clientId);
+        if (data.clientName !== undefined && data.clientName !== client.client_name) {
+            const existing = await this.clientRepository.findByName(data.clientName);
+            if (existing && existing.client_id !== client.client_id) {
+                throw new ConflictError_1.ConflictError(`Client "${data.clientName}" already exists.`);
+            }
+            client.client_name = data.clientName;
+        }
+        if (data.entity !== undefined) {
+            client.entity = data.entity;
+            // Region follows the entity for display/grouping; client_shared_id is
+            // intentionally left untouched (see UpdateClientSchema).
+            client.region = data.entity === ES_1.default.PARICUS_LLC ? REGION_1.default.US : REGION_1.default.CO;
+        }
+        if (data.address !== undefined)
+            client.address = data.address;
+        if (data.primaryContactName !== undefined) {
+            client.primary_contact_name = data.primaryContactName;
+        }
+        if (data.primaryContactEmail !== undefined) {
+            client.primary_contact_email = data.primaryContactEmail;
+        }
+        if (data.primaryContactPhone !== undefined) {
+            client.primary_contact_phone = data.primaryContactPhone;
+        }
         return this.clientRepository.save(client);
     }
     async getClientsByAccess(userId) {

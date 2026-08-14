@@ -7,7 +7,7 @@ import { ConflictError } from '../../../../shared/errors/ConflictError';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
 import { BusinessLogicError } from '../../../../shared/errors/BusinessLogicError';
 import { CreateClientInput, CreateClientSchema } from '../schema/clients/CreateClientSchema';
-import { UpdateClientInput } from '../schema/clients/UpdateClientSchema';
+import { UpdateClientInput, UpdateClientSchema } from '../schema/clients/UpdateClientSchema';
 import { FilterClientInput } from '../schema/clients/FilterClientSchema';
 import ES from '../../../../shared/types/enum/ES';
 import REGION from '../../../../shared/types/enum/REGION';
@@ -77,10 +77,37 @@ export class ClientService implements IClientService {
   }
 
   async updateClient(input: UpdateClientInput): Promise<KbClient> {
-    const client = await this.clientRepository.findById(input.clientId);
-    if (!client) throw new NotFoundError('Client', input.clientId);
+    const data = UpdateClientSchema.parse(input);
 
-    client.client_name = input.clientName;
+    const client = await this.clientRepository.findById(data.clientId);
+    if (!client) throw new NotFoundError('Client', data.clientId);
+
+    if (data.clientName !== undefined && data.clientName !== client.client_name) {
+      const existing = await this.clientRepository.findByName(data.clientName);
+      if (existing && existing.client_id !== client.client_id) {
+        throw new ConflictError(`Client "${data.clientName}" already exists.`);
+      }
+      client.client_name = data.clientName;
+    }
+
+    if (data.entity !== undefined) {
+      client.entity = data.entity;
+      // Region follows the entity for display/grouping; client_shared_id is
+      // intentionally left untouched (see UpdateClientSchema).
+      client.region = data.entity === ES.PARICUS_LLC ? REGION.US : REGION.CO;
+    }
+
+    if (data.address !== undefined) client.address = data.address;
+    if (data.primaryContactName !== undefined) {
+      client.primary_contact_name = data.primaryContactName;
+    }
+    if (data.primaryContactEmail !== undefined) {
+      client.primary_contact_email = data.primaryContactEmail;
+    }
+    if (data.primaryContactPhone !== undefined) {
+      client.primary_contact_phone = data.primaryContactPhone;
+    }
+
     return this.clientRepository.save(client);
   }
 

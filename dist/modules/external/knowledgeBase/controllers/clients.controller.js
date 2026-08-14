@@ -17,6 +17,8 @@ const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const FilterClientSchema_1 = require("../schema/clients/FilterClientSchema");
 const zod_1 = require("zod");
+const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
+const ConflictError_1 = require("../../../../shared/errors/ConflictError");
 let ClientController = class ClientController {
     clientService;
     constructor(clientService) {
@@ -31,6 +33,38 @@ let ClientController = class ClientController {
         const input = req.body;
         await this.clientService.createClient(input, userId);
         res.sendStatus(201);
+    }
+    async updateClient(req, res) {
+        const userId = req.user?.id;
+        const { clientId } = req.params;
+        if (!userId || !clientId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            const updated = await this.clientService.updateClient({
+                ...req.body,
+                clientId,
+            });
+            res.json(updated);
+        }
+        catch (error) {
+            if (error instanceof zod_1.ZodError) {
+                res.status(400).json({ message: 'Validation failed', issues: error.issues });
+                return;
+            }
+            if (error instanceof NotFoundError_1.NotFoundError) {
+                res.status(404).json({ message: error.message });
+                return;
+            }
+            if (error instanceof ConflictError_1.ConflictError) {
+                res.status(409).json({ message: error.message });
+                return;
+            }
+            res.status(400).json({
+                message: error instanceof Error ? error.message : 'Unexpected error',
+            });
+        }
     }
     async getClients(_req, res) {
         const clients = await this.clientService.getClients();

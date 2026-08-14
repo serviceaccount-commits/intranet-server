@@ -61,4 +61,15 @@ clientsRouter.get(
   },
 );
 
+clientsRouter.put(
+  '/:clientId',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await clientController.updateClient(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 export { clientsRouter };

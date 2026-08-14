@@ -47,4 +47,12 @@ clientsRouter.get('/:clientId', async (req, res, next) => {
         next(error);
     }
 });
+clientsRouter.put('/:clientId', async (req, res, next) => {
+    try {
+        await clientController.updateClient(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 //# sourceMappingURL=clients.router.js.map
