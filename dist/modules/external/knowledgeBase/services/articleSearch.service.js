@@ -96,10 +96,16 @@ let ArticleSearchService = class ArticleSearchService {
         const audience = options.audience ?? 'internal';
         const [vectorRanking, textRanking] = await Promise.all([
             this.vectorSearch(trimmed, audience),
-            // Text search runs over the articles collection's $text index, which
-            // covers internal version content only. The client corpus is searched
-            // by vectors alone.
-            audience === 'internal' ? this.textSearch(trimmed) : Promise.resolve([]),
+            // Text search: the internal corpus uses the articles $text index (which
+            // only covers internal versions — Mongo allows one text index per
+            // collection). The client corpus gets an equivalent literal match over
+            // client_copy.{article_name,article_synopsis,content_text}, scoped to
+            // the caller's topics: a plain word that appears in an article's body
+            // ("domicilio" in a consent form) has no semantic signal for the vector
+            // gate and used to return the empty state (UAT CQ-02 #4).
+            audience === 'internal'
+                ? this.textSearch(trimmed)
+                : this.clientTextSearch(trimmed, options.topicIds),
         ]);
         const fused = this.fuseRankings(vectorRanking, textRanking);
         if (fused.length === 0)
@@ -203,6 +209,74 @@ let ArticleSearchService = class ArticleSearchService {
         ])
             .toArray();
         return docs.map((d) => ({ version_id: d['version_id'] }));
+    }
+    /** Literal (case/diacritic-insensitive) match over the CLIENT COPY fields,
+     *  restricted to `topicIds` (a client's tree is small, so a scoped regex is
+     *  cheap and needs no extra index). Returns copy ids, best-first by how
+     *  many query words hit and where (name > synopsis > body). */
+    async clientTextSearch(query, topicIds) {
+        const words = query
+            .split(/\s+/)
+            .map((w) => w.trim())
+            .filter((w) => w.length >= 3)
+            .slice(0, 6);
+        if (words.length === 0)
+            return [];
+        const escape = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Fold common Spanish diacritics on both sides so "asesoria" hits "asesoría".
+        const fold = (w) => escape(w)
+            .replace(/[aá]/gi, '[aá]')
+            .replace(/[eé]/gi, '[eé]')
+            .replace(/[ií]/gi, '[ií]')
+            .replace(/[oó]/gi, '[oó]')
+            .replace(/[uúü]/gi, '[uúü]')
+            .replace(/[nñ]/gi, '[nñ]');
+        const patterns = words.map((w) => new RegExp(fold(w), 'i'));
+        const col = (0, kb_collections_1.getArticlesCollection)((0, mongo_connection_1.getMongoDb)());
+        const match = {
+            client_copy: { $exists: true },
+            available_for_client: true,
+        };
+        if (topicIds && topicIds.length > 0)
+            match['topic_id'] = { $in: topicIds };
+        const docs = await col
+            .find(match, {
+            projection: {
+                _id: 1,
+                'client_copy._id': 1,
+                'client_copy.article_name': 1,
+                'client_copy.article_synopsis': 1,
+                'client_copy.content_text': 1,
+                'client_copy.content': 1,
+            },
+        })
+            .toArray();
+        const scored = [];
+        for (const d of docs) {
+            const copy = d.client_copy;
+            if (!copy)
+                continue;
+            const name = copy.article_name ?? '';
+            const synopsis = copy.article_synopsis ?? '';
+            // Fall back to a crude tag-strip when content_text was never extracted.
+            const body = copy.content_text ?? (copy.content ?? '').replace(/<[^>]+>/g, ' ');
+            let score = 0;
+            for (const re of patterns) {
+                if (re.test(name))
+                    score += 3;
+                else if (re.test(synopsis))
+                    score += 2;
+                else if (re.test(body))
+                    score += 1;
+            }
+            // Every word must hit somewhere — AND semantics, like the vector path's
+            // intent — otherwise long queries match noise.
+            const allHit = patterns.every((re) => re.test(name) || re.test(synopsis) || re.test(body));
+            if (allHit && score > 0)
+                scored.push({ version_id: copy._id.toString(), score });
+        }
+        scored.sort((a, b) => b.score - a.score);
+        return scored.slice(0, TEXT_TOP_K).map((s) => ({ version_id: s.version_id }));
     }
     // ─── RRF fusion ───────────────────────────────────────────────────────────────
     fuseRankings(vec, text) {
