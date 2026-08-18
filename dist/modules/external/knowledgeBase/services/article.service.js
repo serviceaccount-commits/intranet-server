@@ -537,6 +537,10 @@ let ArticleService = class ArticleService {
         const created = await this.articleRepository.createArticle(data.topicId, ArticleService_1.PORTAL_ACTOR_ID, data.articleName, data.content, data.actorName);
         if (data.synopsis) {
             await this.articleRepository.updateVersionSynopsis(created.article_version_id, data.synopsis);
+            // The portal lists the CLIENT COPY (seeded by createArticle with an
+            // empty synopsis) — mirror the initial synopsis there too, otherwise the
+            // client sees a blank synopsis for an article they just wrote (CQ-03 #1).
+            await this.articleRepository.updateClientCopy(created.article_id, { synopsis: data.synopsis }, ArticleService_1.PORTAL_ACTOR_ID, data.actorName ?? null);
         }
         await this.articleRepository.updateVersionStatus(created.article_version_id, 'published');
         await this.articleRepository.setAvailableForClient(created.article_version_id, true);
