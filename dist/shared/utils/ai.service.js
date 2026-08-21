@@ -46,25 +46,33 @@ const stripMarkdown = (text) => text
     .replace(/`+/g, '') // inline code backticks
     .replace(/^\s*[*_#>•-]+\s*/gm, '') // leading bullets / headings / blockquote per line
     // The model sometimes prefixes a label line ("**Synopsis:**", "Sinopsis:",
-    // "Resumen:", "Summary:") before the actual two sentences — drop it. The
-    // real synopsis always starts with "Use this guide when…" / "Usa esta guía
-    // cuando…", so this never eats genuine content.
+    // "Resumen:", "Summary:") before the actual sentences — drop it.
     .replace(/^\s*(synopsis|sinopsis|resumen|summary)\s*:?\s*/i, '')
     .trim();
+/** A synopsis must describe the article, never open with a usage formula
+ *  ("Use this guide when…", "Usa esta guía cuando…", "Relevant for customers
+ *  asking about…"). The prompt forbids it; this is the safety net for when the
+ *  model ignores it — drop that leading sentence and keep the descriptive rest
+ *  (only when something meaningful remains after it). */
+const USAGE_OPENER = /^\s*(use this guide|this guide is (useful|relevant)|relevant for|us[ae] esta gu[ií]a|utili[cz]a esta gu[ií]a|esta gu[ií]a (es útil|sirve|aplica)|consulta esta gu[ií]a)\b[^.!?]*[.!?]\s*/i;
+const stripUsageOpener = (text) => {
+    const rest = text.replace(USAGE_OPENER, '').trim();
+    return rest.length >= 40 ? rest : text;
+};
 const generateArticleSynopsis = async (articleContent) => {
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const prompt = `You are a Senior Knowledge Base Manager for a Customer Support BPO.
       Your task is to write a concise internal synopsis for the following article to be displayed to Customer Service Representatives (CSRs).
 
-      The goal is to help the CSR instantly recognize if this article contains the solution to the customer on the line.
+      The goal is to help the CSR instantly recognize what this article is and what it contains.
 
       **Guidelines:**
       1. **Structure:** The synopsis must consist of exactly two sentences, have between 40 to 70 words and no more than 500 characters.
-         - **Sentence 1 (The Scenario):** Describe the specific customer complaint or question that triggers the need for this article. Start with "Use this guide when..." or "Relevant for customers asking about..."
-         - **Sentence 2 (The Solution):** Summarize the specific procedure, script, or answer contained in the article.
-      2. **Tone:** Professional, direct, and utility-focused. No marketing fluff. No rhetorical questions.
-      3. **Constraint:** Do not speak to the customer ("You will find..."). Speak to the Agent ("This guide explains...").
+         - **Sentence 1 (What it is):** State what the document is and its subject (e.g. "Informed consent form for facial biorevitalization." / "Internal protocol for overtime authorization and payment.").
+         - **Sentence 2 (What it covers):** Summarize the specific procedure, script, policy points, or answer contained in the article.
+      2. **It is a synopsis, not a usage instruction.** NEVER open with "Use this guide when...", "Usa esta guía cuando...", "Relevant for customers asking about...", "This guide is useful when..." or any similar formula. Do not tell the reader when to use the article; describe the article.
+      3. **Tone:** Professional, direct, and descriptive. No marketing fluff. No rhetorical questions. Do not speak to the customer ("You will find...").
       4. **Language:** Write the synopsis in the SAME language as the article content below (e.g. Spanish article → Spanish synopsis, English article → English synopsis). Detect it from the content; do not translate.
       5. **Format:** Output PLAIN TEXT ONLY. Do NOT use Markdown — no asterisks, no bold, no bullet points, no headings. Return only the two sentences.
 
@@ -73,7 +81,7 @@ const generateArticleSynopsis = async (articleContent) => {
         const result = await model.generateContent(prompt);
         const response = result.response;
         const text = response.text();
-        return stripMarkdown(text);
+        return stripUsageOpener(stripMarkdown(text));
     }
     catch (error) {
         logger_1.logger.error('Error in generateArticleSynopsis:', error);
