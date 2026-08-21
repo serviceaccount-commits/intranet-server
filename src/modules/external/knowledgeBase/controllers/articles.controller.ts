@@ -144,7 +144,31 @@ export class ArticleController {
       const article = await this.articleService.generateAISynopsis(articleId);
       res.json(article);
     } catch (error) {
-      res.status(400).json({ error });
+      // Tell the editor WHY it failed. The common case is the Gemini daily
+      // quota (free tier → HTTP 429 / RESOURCE_EXHAUSTED); before, every
+      // failure surfaced as a generic "An error occurred" (UAT A-05 #1).
+      const err = error as { message?: string; status?: number; response?: { status?: number } };
+      const message = String(err?.message || '');
+      const status = err?.status ?? err?.response?.status;
+      const quotaExhausted =
+        status === 429 || /\b429\b|RESOURCE_EXHAUSTED|quota|Too Many Requests/i.test(message);
+      if (quotaExhausted) {
+        res.status(429).json({
+          error: {
+            code: 'AI_QUOTA_EXHAUSTED',
+            message:
+              'The AI synopsis quota is exhausted for now (daily limit reached). Try again later or write the synopsis manually.',
+          },
+        });
+        return;
+      }
+      res.status(502).json({
+        error: {
+          code: 'AI_SYNOPSIS_FAILED',
+          message:
+            'The AI synopsis could not be generated right now. Try again in a moment or write it manually.',
+        },
+      });
     }
   }
 
