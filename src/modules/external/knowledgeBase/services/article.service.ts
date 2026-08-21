@@ -782,14 +782,14 @@ export class ArticleService implements IArticleService {
   ): Promise<{ article_status: string }> {
     const current = await this.resolveOwnedClientCopy(clientSharedId, copyId);
 
-    await this.articleRepository.setAvailableForClientByArticleId(current.article_id, false);
-    await this.chunkingService.processVersionSafe(
-      current.article_id,
-      current.client_copy_id,
-      '',
-      'client',
-    );
-    return { article_status: 'unavailable' };
+    // Portal "Delete" = archive the whole article (same operation as the
+    // intranet archive): every version → 'archived', hidden from the client,
+    // all chunks wiped. Previously this only flipped `available_for_client`,
+    // so BPO admins (whose portal list ignores that flag) kept seeing the
+    // "deleted" article. Reversible from the intranet via restoreArticles.
+    await this.articleRepository.archiveArticlesByIds([current.article_id]);
+    await this.chunkingService.clearArticle(current.article_id);
+    return { article_status: 'archived' };
   }
 
   async findSharedArticlesByClientSharedId(

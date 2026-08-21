@@ -756,6 +756,9 @@ let ArticleRepository = class ArticleRepository {
         const match = {
             topic_id: { $in: topicIds },
             'client_copy._id': { $exists: true },
+            // Archived articles (every version 'archived') never surface in the
+            // portal — not even for admins, whose list ignores the availability flag.
+            versions: { $elemMatch: { article_status: { $ne: 'archived' } } },
         };
         if (!includeUnavailable)
             match['available_for_client'] = true;
@@ -775,6 +778,7 @@ let ArticleRepository = class ArticleRepository {
         const match = {
             topic_id: { $in: topicIds },
             'client_copy._id': new mongodb_1.ObjectId(copyId),
+            versions: { $elemMatch: { article_status: { $ne: 'archived' } } },
         };
         if (!includeUnavailable)
             match['available_for_client'] = true;
