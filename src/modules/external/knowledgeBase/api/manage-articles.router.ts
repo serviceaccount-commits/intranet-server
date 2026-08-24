@@ -41,4 +41,16 @@ manageArticlesRouter.delete(
   },
 );
 
+// PUT /external/manage/articles/:clientSharedId/:versionId/move
+manageArticlesRouter.put(
+  '/:clientSharedId/:versionId/move',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await manageArticlesController.moveArticle(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 export { manageArticlesRouter };

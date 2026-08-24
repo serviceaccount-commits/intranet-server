@@ -71,6 +71,24 @@ export class ManageArticlesController {
     }
   }
 
+  async moveArticle(req: Request, res: Response) {
+    const { clientSharedId, versionId } = req.params;
+    if (!clientSharedId || !versionId) {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      const result = await this.articleService.moveManagedArticle(
+        clientSharedId,
+        versionId,
+        req.body,
+      );
+      res.json(result);
+    } catch (error) {
+      this.handleError(error, res);
+    }
+  }
+
   private handleError(error: unknown, res: Response) {
     if (error instanceof NotFoundError) {
       res.status(404).json({ message: error.message });

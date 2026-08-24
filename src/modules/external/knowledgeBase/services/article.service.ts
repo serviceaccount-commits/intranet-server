@@ -27,6 +27,10 @@ import { BusinessLogicError } from '../../../../shared/errors/BusinessLogicError
 import { FilterArticleInput } from '../schema/articles/FilterArticleSchema';
 import { MoveArticleInput, MoveArticleSchema } from '../schema/clients/MoveArticleSchema';
 import {
+  MoveManagedArticleInput,
+  MoveManagedArticleSchema,
+} from '../schema/clients/MoveManagedArticleSchema';
+import {
   CreateManagedArticleInput,
   CreateManagedArticleSchema,
   UpdateManagedArticleInput,
@@ -790,6 +794,34 @@ export class ArticleService implements IArticleService {
     await this.articleRepository.archiveArticlesByIds([current.article_id]);
     await this.chunkingService.clearArticle(current.article_id);
     return { article_status: 'archived' };
+  }
+
+  /**
+   * Portal "Move article": moves the whole article (all versions + client
+   * copy) to `topicId`. The folder may belong to another client when
+   * `targetClientSharedId` is given (the portal double-confirms that case);
+   * the topic is always verified to belong to the destination client so an
+   * article can never land in a folder of a client that was not named.
+   */
+  async moveManagedArticle(
+    clientSharedId: string,
+    copyId: string,
+    input: MoveManagedArticleInput,
+  ): Promise<{ article_id: string; topic_id: string; client_shared_id: string }> {
+    const data = MoveManagedArticleSchema.parse(input);
+    const current = await this.resolveOwnedClientCopy(clientSharedId, copyId);
+
+    const targetShared = data.targetClientSharedId || clientSharedId;
+    const targetClient = await this.clientRepository.findBySharedId(targetShared);
+    if (!targetClient) throw new NotFoundError('Client', targetShared);
+
+    const topic = await this.topicRepository.findById(data.topicId);
+    if (!topic || topic.client_id !== targetClient.client_id) {
+      throw new NotFoundError('Topic', data.topicId);
+    }
+
+    await this.articleRepository.moveArticlesByArticleIds([current.article_id], topic.topic_id);
+    return { article_id: current.article_id, topic_id: topic.topic_id, client_shared_id: targetShared };
   }
 
   async findSharedArticlesByClientSharedId(

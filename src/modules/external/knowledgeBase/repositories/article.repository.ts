@@ -739,6 +739,16 @@ export class ArticleRepository implements IArticleRepository {
     );
   }
 
+  /** Moves whole articles (every version + client copy) to another topic. */
+  async moveArticlesByArticleIds(articleIds: string[], topicId: string): Promise<void> {
+    const oids = articleIds.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id));
+    if (oids.length === 0) return;
+    await this.col.updateMany(
+      { _id: { $in: oids } },
+      { $set: { topic_id: topicId, updatedAt: new Date() } },
+    );
+  }
+
   // ─── Maintenance ──────────────────────────────────────────────────────────────
 
   async clearExpiredLocks(): Promise<number> {

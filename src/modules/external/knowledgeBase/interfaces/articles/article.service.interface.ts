@@ -10,6 +10,7 @@ import {
 import { CreateVersionInput } from '../../schema/articles/CreateVersionSchema';
 import { FilterArticleInput } from '../../schema/articles/FilterArticleSchema';
 import { MoveArticleInput } from '../../schema/clients/MoveArticleSchema';
+import { MoveManagedArticleInput } from '../../schema/clients/MoveManagedArticleSchema';
 import {
   CreateManagedArticleInput,
   UpdateManagedArticleInput,
@@ -198,6 +199,13 @@ export interface IArticleService {
     clientSharedId: string,
     copyId: string,
   ): Promise<{ article_status: string }>;
+
+  /** Portal move (optionally to another client's folder — double-confirmed). */
+  moveManagedArticle(
+    clientSharedId: string,
+    copyId: string,
+    input: MoveManagedArticleInput,
+  ): Promise<{ article_id: string; topic_id: string; client_shared_id: string }>;
 
   // ── Admin (ignores available_for_client flag) ────────────────────────────────
   findAllPublishedByClientSharedId(

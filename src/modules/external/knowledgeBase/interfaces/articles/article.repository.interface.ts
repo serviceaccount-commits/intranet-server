@@ -117,6 +117,7 @@ export interface IArticleRepository {
   // ── Bulk operations ──────────────────────────────────────────────────────────
 
   moveArticlesToTopic(versionIds: string[], topicId: string): Promise<void>;
+  moveArticlesByArticleIds(articleIds: string[], topicId: string): Promise<void>;
 
   // ── Maintenance ──────────────────────────────────────────────────────────────
 
