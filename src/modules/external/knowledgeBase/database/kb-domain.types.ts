@@ -264,6 +264,8 @@ export interface KbClient {
   client_edit_available: boolean;
   region: string;
   entity: string;
+  // 'COP' | 'USD' — billed currency, independent of region/entity.
+  currency: string;
   is_im: boolean;
   is_flx: boolean;
   user_id: string | null;

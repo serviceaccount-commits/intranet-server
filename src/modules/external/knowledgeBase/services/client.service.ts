@@ -10,6 +10,7 @@ import { CreateClientInput, CreateClientSchema } from '../schema/clients/CreateC
 import { UpdateClientInput, UpdateClientSchema } from '../schema/clients/UpdateClientSchema';
 import { FilterClientInput } from '../schema/clients/FilterClientSchema';
 import ES from '../../../../shared/types/enum/ES';
+import CURRENCY from '../../../../shared/types/enum/CURRENCY';
 import REGION from '../../../../shared/types/enum/REGION';
 
 @injectable()
@@ -59,6 +60,11 @@ export class ClientService implements IClientService {
       client_shared_id: clientSharedId,
       region,
       entity: data.entity,
+      // Not sent by every caller: default to what the entity usually bills in,
+      // which reproduces the behaviour that used to be inferred from the country.
+      currency:
+        data.currency ??
+        (data.entity === ES.PARICUS_COLOMBIA ? CURRENCY.COP : CURRENCY.USD),
       is_im: data.isIM ?? false,
       is_flx: data.isFLX ?? false,
       client_edit_available: true,
@@ -97,6 +103,7 @@ export class ClientService implements IClientService {
       client.region = data.entity === ES.PARICUS_LLC ? REGION.US : REGION.CO;
     }
 
+    if (data.currency !== undefined) client.currency = data.currency;
     if (data.address !== undefined) client.address = data.address;
     if (data.primaryContactName !== undefined) {
       client.primary_contact_name = data.primaryContactName;

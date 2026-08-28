@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import ES from '../../../../../shared/types/enum/ES';
+import CURRENCY from '../../../../../shared/types/enum/CURRENCY';
 
 // Every field is optional so the UI can send only what changed; clientId
 // rides in the route param and is merged in by the controller.
@@ -15,6 +16,9 @@ export const UpdateClientSchema = z
     // cross-system key (portal users' kbPrefix, KB topics) and must stay
     // stable for the client's lifetime.
     entity: z.enum([ES.PARICUS_LLC, ES.PARICUS_COLOMBIA]).optional(),
+    // Changing the entity does NOT touch the currency: they are separate
+    // decisions on purpose.
+    currency: z.enum([CURRENCY.COP, CURRENCY.USD]).optional(),
     address: z.string().min(2, 'Address must contain at least 2 characters').optional(),
     primaryContactName: z
       .string()

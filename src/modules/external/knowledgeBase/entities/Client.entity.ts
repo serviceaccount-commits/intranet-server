@@ -19,6 +19,7 @@ import { User } from '../../../internal/users/entities/User.entity';
 import { Topic } from './Topic.entity';
 import REGION from '../../../../shared/types/enum/REGION';
 import ES from '../../../../shared/types/enum/ES';
+import CURRENCY from '../../../../shared/types/enum/CURRENCY';
 
 @Entity('clients')
 export class Client extends BaseEntity {
@@ -72,6 +73,16 @@ export class Client extends BaseEntity {
     default: ES.PARICUS_LLC,
   })
   entity!: string;
+
+  // Deliberately independent of `entity` / `region`: a Colombian client can be
+  // billed in USD and vice versa. This is what the portal uses to default and
+  // format invoice amounts.
+  @Column({
+    type: 'enum',
+    enum: [CURRENCY.COP, CURRENCY.USD],
+    default: CURRENCY.USD,
+  })
+  currency!: string;
 
   @Column({ nullable: true, unique: true })
   address!: string;
