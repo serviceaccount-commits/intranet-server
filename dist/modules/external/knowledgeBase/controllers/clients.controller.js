@@ -121,6 +121,8 @@ let ClientController = class ClientController {
             .map((c) => ({
             client_shared_id: c.client_shared_id,
             client_name: c.client_name,
+            // The portal defaults and formats invoice amounts from this.
+            currency: c.currency,
         }))
             .sort((a, b) => a.client_shared_id.localeCompare(b.client_shared_id));
         res.json(minimal);

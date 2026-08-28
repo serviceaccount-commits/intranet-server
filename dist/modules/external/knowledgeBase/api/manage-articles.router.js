@@ -31,4 +31,13 @@ manageArticlesRouter.delete('/:clientSharedId/:versionId', async (req, res, next
         next(error);
     }
 });
+// PUT /external/manage/articles/:clientSharedId/:versionId/move
+manageArticlesRouter.put('/:clientSharedId/:versionId/move', async (req, res, next) => {
+    try {
+        await manageArticlesController.moveArticle(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 //# sourceMappingURL=manage-articles.router.js.map

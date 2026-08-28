@@ -599,6 +599,13 @@ let ArticleRepository = class ArticleRepository {
             return;
         await this.col.updateMany({ 'versions._id': { $in: oids } }, { $set: { topic_id: topicId, updatedAt: new Date() } });
     }
+    /** Moves whole articles (every version + client copy) to another topic. */
+    async moveArticlesByArticleIds(articleIds, topicId) {
+        const oids = articleIds.filter((id) => mongodb_1.ObjectId.isValid(id)).map((id) => new mongodb_1.ObjectId(id));
+        if (oids.length === 0)
+            return;
+        await this.col.updateMany({ _id: { $in: oids } }, { $set: { topic_id: topicId, updatedAt: new Date() } });
+    }
     // ─── Maintenance ──────────────────────────────────────────────────────────────
     async clearExpiredLocks() {
         const result = await this.col.updateMany({ lock_expires_at: { $lt: new Date() } }, { $set: { locked_by_user_id: null, lock_expires_at: null, updatedAt: new Date() } });

@@ -24,6 +24,7 @@ const BusinessLogicError_1 = require("../../../../shared/errors/BusinessLogicErr
 const CreateClientSchema_1 = require("../schema/clients/CreateClientSchema");
 const UpdateClientSchema_1 = require("../schema/clients/UpdateClientSchema");
 const ES_1 = __importDefault(require("../../../../shared/types/enum/ES"));
+const CURRENCY_1 = __importDefault(require("../../../../shared/types/enum/CURRENCY"));
 const REGION_1 = __importDefault(require("../../../../shared/types/enum/REGION"));
 let ClientService = class ClientService {
     clientRepository;
@@ -65,6 +66,10 @@ let ClientService = class ClientService {
             client_shared_id: clientSharedId,
             region,
             entity: data.entity,
+            // Not sent by every caller: default to what the entity usually bills in,
+            // which reproduces the behaviour that used to be inferred from the country.
+            currency: data.currency ??
+                (data.entity === ES_1.default.PARICUS_COLOMBIA ? CURRENCY_1.default.COP : CURRENCY_1.default.USD),
             is_im: data.isIM ?? false,
             is_flx: data.isFLX ?? false,
             client_edit_available: true,
@@ -97,6 +102,8 @@ let ClientService = class ClientService {
             // intentionally left untouched (see UpdateClientSchema).
             client.region = data.entity === ES_1.default.PARICUS_LLC ? REGION_1.default.US : REGION_1.default.CO;
         }
+        if (data.currency !== undefined)
+            client.currency = data.currency;
         if (data.address !== undefined)
             client.address = data.address;
         if (data.primaryContactName !== undefined) {

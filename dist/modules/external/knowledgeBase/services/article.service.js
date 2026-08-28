@@ -54,6 +54,7 @@ const ValidationError_1 = require("../../../../shared/errors/ValidationError");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 const BusinessLogicError_1 = require("../../../../shared/errors/BusinessLogicError");
 const MoveArticleSchema_1 = require("../schema/clients/MoveArticleSchema");
+const MoveManagedArticleSchema_1 = require("../schema/clients/MoveManagedArticleSchema");
 const ManagedArticleSchemas_1 = require("../schema/manage/ManagedArticleSchemas");
 const CreateVersionSchema_1 = require("../schema/articles/CreateVersionSchema");
 const ai_service_1 = require("../../../../shared/utils/ai.service");
@@ -584,6 +585,27 @@ let ArticleService = class ArticleService {
         await this.articleRepository.archiveArticlesByIds([current.article_id]);
         await this.chunkingService.clearArticle(current.article_id);
         return { article_status: 'archived' };
+    }
+    /**
+     * Portal "Move article": moves the whole article (all versions + client
+     * copy) to `topicId`. The folder may belong to another client when
+     * `targetClientSharedId` is given (the portal double-confirms that case);
+     * the topic is always verified to belong to the destination client so an
+     * article can never land in a folder of a client that was not named.
+     */
+    async moveManagedArticle(clientSharedId, copyId, input) {
+        const data = MoveManagedArticleSchema_1.MoveManagedArticleSchema.parse(input);
+        const current = await this.resolveOwnedClientCopy(clientSharedId, copyId);
+        const targetShared = data.targetClientSharedId || clientSharedId;
+        const targetClient = await this.clientRepository.findBySharedId(targetShared);
+        if (!targetClient)
+            throw new NotFoundError_1.NotFoundError('Client', targetShared);
+        const topic = await this.topicRepository.findById(data.topicId);
+        if (!topic || topic.client_id !== targetClient.client_id) {
+            throw new NotFoundError_1.NotFoundError('Topic', data.topicId);
+        }
+        await this.articleRepository.moveArticlesByArticleIds([current.article_id], topic.topic_id);
+        return { article_id: current.article_id, topic_id: topic.topic_id, client_shared_id: targetShared };
     }
     async findSharedArticlesByClientSharedId(filters, clientSharedId, topicId, userId) {
         // `userId` is present only on the internal (staff JWT) route — scope it.

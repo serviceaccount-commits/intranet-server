@@ -19,6 +19,7 @@ const User_entity_1 = require("../../../internal/users/entities/User.entity");
 const Topic_entity_1 = require("./Topic.entity");
 const REGION_1 = __importDefault(require("../../../../shared/types/enum/REGION"));
 const ES_1 = __importDefault(require("../../../../shared/types/enum/ES"));
+const CURRENCY_1 = __importDefault(require("../../../../shared/types/enum/CURRENCY"));
 let Client = class Client extends typeorm_1.BaseEntity {
     client_id;
     client_shared_id;
@@ -34,6 +35,10 @@ let Client = class Client extends typeorm_1.BaseEntity {
     is_im = false;
     is_flx = false;
     entity;
+    // Deliberately independent of `entity` / `region`: a Colombian client can be
+    // billed in USD and vice versa. This is what the portal uses to default and
+    // format invoice amounts.
+    currency;
     address;
     primary_contact_name;
     primary_contact_email;
@@ -109,6 +114,14 @@ __decorate([
     }),
     __metadata("design:type", String)
 ], Client.prototype, "entity", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: 'enum',
+        enum: [CURRENCY_1.default.COP, CURRENCY_1.default.USD],
+        default: CURRENCY_1.default.USD,
+    }),
+    __metadata("design:type", String)
+], Client.prototype, "currency", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true, unique: true }),
     __metadata("design:type", String)
