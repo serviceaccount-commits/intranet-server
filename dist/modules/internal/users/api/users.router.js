@@ -8,10 +8,22 @@ const express_1 = require("express");
 const users_controller_1 = __importDefault(require("../controllers/users.controller"));
 const inversify_config_1 = require("../../../../shared/config/inversify.config");
 const auth_middleware_1 = require("../../auth/middlewares/auth.middleware");
+const permission_middleware_1 = require("../../auth/middlewares/permission.middleware");
 let userController;
 const usersRouter = (0, express_1.Router)();
 exports.usersRouter = usersRouter;
-usersRouter.post('/', async (req, res, next) => {
+// Creating, editing and deleting people is the Staff Directory's
+// administrative ability. Announcements reaches the same endpoint from its own
+// screen, so both go through the one permission that governs it.
+const canAdminUsers = (0, permission_middleware_1.checkPermission)('directory:user:create');
+// Reading the user list feeds the directory itself and the recipient pickers of
+// Announcements — accept whichever module the caller actually holds.
+const canListUsers = (0, permission_middleware_1.checkAnyPermission)('directory:list', 'directory:access', 'announcements:access');
+// Someone always gets to read and edit their own record; everyone else needs
+// the directory permission.
+const canReadProfile = (0, permission_middleware_1.checkSelfOrPermission)('userId', 'directory:profile:access');
+const canEditUser = (0, permission_middleware_1.checkSelfOrPermission)('userId', 'directory:user:create');
+usersRouter.post('/', canAdminUsers, async (req, res, next) => {
     try {
         if (!userController) {
             userController = inversify_config_1.container.get(users_controller_1.default);
@@ -22,6 +34,8 @@ usersRouter.post('/', async (req, res, next) => {
         next(error);
     }
 });
+// Self-service: every signed-in user reports their own activity and closes
+// their own onboarding, so these stay open to anyone authenticated.
 usersRouter.post('/last-activity', async (req, res, next) => {
     try {
         if (!userController) {
@@ -44,7 +58,7 @@ usersRouter.post('/onboarding-completed', async (req, res, next) => {
         next(error);
     }
 });
-usersRouter.get('/', auth_middleware_1.authenticateJWT, async (req, res, next) => {
+usersRouter.get('/', auth_middleware_1.authenticateJWT, canListUsers, async (req, res, next) => {
     try {
         if (!userController) {
             userController = inversify_config_1.container.get(users_controller_1.default);
@@ -55,6 +69,7 @@ usersRouter.get('/', auth_middleware_1.authenticateJWT, async (req, res, next) =
         next(error);
     }
 });
+// The home page ranking: shown to everyone who can log in.
 usersRouter.get('/sheet-data/:sheetOption', async (req, res, next) => {
     try {
         if (!userController) {
@@ -66,7 +81,7 @@ usersRouter.get('/sheet-data/:sheetOption', async (req, res, next) => {
         next(error);
     }
 });
-usersRouter.get('/profile/:userId', async (req, res, next) => {
+usersRouter.get('/profile/:userId', canReadProfile, async (req, res, next) => {
     try {
         if (!userController) {
             userController = inversify_config_1.container.get(users_controller_1.default);
@@ -77,6 +92,7 @@ usersRouter.get('/profile/:userId', async (req, res, next) => {
         next(error);
     }
 });
+// Three segments, so it never collides with '/profile/:userId' above.
 usersRouter.get('/profile/me/profile', async (req, res, next) => {
     try {
         if (!userController) {
@@ -88,7 +104,7 @@ usersRouter.get('/profile/me/profile', async (req, res, next) => {
         next(error);
     }
 });
-usersRouter.put('/:userId', async (req, res, next) => {
+usersRouter.put('/:userId', canEditUser, async (req, res, next) => {
     try {
         if (!userController) {
             userController = inversify_config_1.container.get(users_controller_1.default);
@@ -99,7 +115,7 @@ usersRouter.put('/:userId', async (req, res, next) => {
         next(error);
     }
 });
-usersRouter.delete('/:userId', async (req, res, next) => {
+usersRouter.delete('/:userId', canAdminUsers, async (req, res, next) => {
     try {
         if (!userController) {
             userController = inversify_config_1.container.get(users_controller_1.default);

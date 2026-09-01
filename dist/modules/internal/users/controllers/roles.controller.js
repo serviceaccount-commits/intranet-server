@@ -39,7 +39,7 @@ let RoleController = class RoleController {
         }
         catch (error) {
             if (error instanceof AppError_1.AppError) {
-                return res.status(400).json({ message: error.message });
+                return res.status(error.statusCode).json({ message: error.message });
             }
             next(error);
         }
@@ -72,7 +72,7 @@ let RoleController = class RoleController {
         }
         catch (error) {
             if (error instanceof AppError_1.AppError) {
-                return res.status(400).json({ message: error.message });
+                return res.status(error.statusCode).json({ message: error.message });
             }
             next(error);
         }
@@ -89,7 +89,7 @@ let RoleController = class RoleController {
         }
         catch (error) {
             if (error instanceof AppError_1.AppError) {
-                return res.status(400).json({ message: error.message });
+                return res.status(error.statusCode).json({ message: error.message });
             }
             next(error);
         }

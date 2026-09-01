@@ -19,6 +19,7 @@ const Role_entity_1 = require("../entities/Role.entity");
 const data_source_1 = require("../../../../shared/database/data-source");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 const BusinessLogicError_1 = require("../../../../shared/errors/BusinessLogicError");
+const ActionNotAllowedError_1 = require("../../../../shared/errors/ActionNotAllowedError");
 let RoleService = class RoleService {
     roleRepository;
     permissionRespository;
@@ -49,16 +50,40 @@ let RoleService = class RoleService {
         }
         return role;
     }
+    /**
+     * A derived role may never hold more than the role it was derived from, and
+     * a base role is fixed.
+     *
+     * The Roles screen already greys out the boxes above that ceiling, but a
+     * checkbox attribute is a hint, not a rule: a request made by hand went
+     * straight through and could hand a role the whole catalog. This is the same
+     * rule where it actually holds.
+     */
     async updateRolePermissions(roleId, permissionIds) {
+        if (!Array.isArray(permissionIds)) {
+            throw new BusinessLogicError_1.BusinessLogicError('permissionIds must be an array.');
+        }
         await data_source_1.AppDataSource.manager.transaction(async (_t) => {
-            const role = await this.roleRepository.findById(roleId);
+            const role = await this.roleRepository.findByIdWithParent(roleId);
             if (!role) {
                 throw new NotFoundError_1.NotFoundError(`Role`, roleId);
             }
-            const allPermissions = await this.permissionRespository.findAllByIds(permissionIds);
-            if (allPermissions.length !== permissionIds.length) {
+            if (role.is_base_role) {
+                throw new ActionNotAllowedError_1.ActionNotAllowedError('The permissions of a base role cannot be changed.');
+            }
+            if (!role.parentRole) {
+                throw new ActionNotAllowedError_1.ActionNotAllowedError('This role is not derived from another role, so its permissions cannot be edited.');
+            }
+            const requestedIds = [...new Set(permissionIds)];
+            const ceiling = new Set((role.parentRole.permissions || []).map((p) => p.permission_id));
+            const outsideCeiling = requestedIds.filter((id) => !ceiling.has(id));
+            if (outsideCeiling.length > 0) {
+                throw new ActionNotAllowedError_1.ActionNotAllowedError(`Cannot grant permissions that the parent role does not have: ${outsideCeiling.join(', ')}`);
+            }
+            const allPermissions = await this.permissionRespository.findAllByIds(requestedIds);
+            if (allPermissions.length !== requestedIds.length) {
                 const foundPermissionIds = allPermissions.map((p) => p.permission_id);
-                const notFoundPermissionIds = permissionIds.filter((id) => !foundPermissionIds.includes(id));
+                const notFoundPermissionIds = requestedIds.filter((id) => !foundPermissionIds.includes(id));
                 throw new NotFoundError_1.NotFoundError(`Permissions not found: ${notFoundPermissionIds.join(', ')}`);
             }
             role.permissions = allPermissions;
