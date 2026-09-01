@@ -34,7 +34,7 @@ export class RoleController {
       res.json(role);
     } catch (error) {
       if (error instanceof AppError) {
-        return res.status(400).json({ message: error.message });
+        return res.status(error.statusCode).json({ message: error.message });
       }
       next(error);
     }
@@ -74,7 +74,7 @@ export class RoleController {
       res.sendStatus(200);
     } catch (error) {
       if (error instanceof AppError) {
-        return res.status(400).json({ message: error.message });
+        return res.status(error.statusCode).json({ message: error.message });
       }
       next(error);
     }
@@ -92,7 +92,7 @@ export class RoleController {
       res.sendStatus(200);
     } catch (error) {
       if (error instanceof AppError) {
-        return res.status(400).json({ message: error.message });
+        return res.status(error.statusCode).json({ message: error.message });
       }
       next(error);
     }

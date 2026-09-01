@@ -10,6 +10,7 @@ import { Permission } from '../entities/Permission.entity';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
 import { CreateRoleInput } from '../schema/roles/CreateRoleSchema';
 import { BusinessLogicError } from '../../../../shared/errors/BusinessLogicError';
+import { ActionNotAllowedError } from '../../../../shared/errors/ActionNotAllowedError';
 
 @injectable()
 export class RoleService implements IRoleService {
@@ -60,21 +61,58 @@ export class RoleService implements IRoleService {
     return role;
   }
 
+  /**
+   * A derived role may never hold more than the role it was derived from, and
+   * a base role is fixed.
+   *
+   * The Roles screen already greys out the boxes above that ceiling, but a
+   * checkbox attribute is a hint, not a rule: a request made by hand went
+   * straight through and could hand a role the whole catalog. This is the same
+   * rule where it actually holds.
+   */
   async updateRolePermissions(
     roleId: string,
     permissionIds: string[],
   ): Promise<void> {
+    if (!Array.isArray(permissionIds)) {
+      throw new BusinessLogicError('permissionIds must be an array.');
+    }
+
     await AppDataSource.manager.transaction(async (_t) => {
-      const role = await this.roleRepository.findById(roleId);
+      const role = await this.roleRepository.findByIdWithParent(roleId);
       if (!role) {
         throw new NotFoundError(`Role`, roleId);
       }
 
+      if (role.is_base_role) {
+        throw new ActionNotAllowedError(
+          'The permissions of a base role cannot be changed.',
+        );
+      }
+
+      if (!role.parentRole) {
+        throw new ActionNotAllowedError(
+          'This role is not derived from another role, so its permissions cannot be edited.',
+        );
+      }
+
+      const requestedIds = [...new Set(permissionIds)];
+
+      const ceiling = new Set(
+        (role.parentRole.permissions || []).map((p) => p.permission_id),
+      );
+      const outsideCeiling = requestedIds.filter((id) => !ceiling.has(id));
+      if (outsideCeiling.length > 0) {
+        throw new ActionNotAllowedError(
+          `Cannot grant permissions that the parent role does not have: ${outsideCeiling.join(', ')}`,
+        );
+      }
+
       const allPermissions =
-        await this.permissionRespository.findAllByIds(permissionIds);
-      if (allPermissions.length !== permissionIds.length) {
+        await this.permissionRespository.findAllByIds(requestedIds);
+      if (allPermissions.length !== requestedIds.length) {
         const foundPermissionIds = allPermissions.map((p) => p.permission_id);
-        const notFoundPermissionIds = permissionIds.filter(
+        const notFoundPermissionIds = requestedIds.filter(
           (id) => !foundPermissionIds.includes(id),
         );
         throw new NotFoundError(
