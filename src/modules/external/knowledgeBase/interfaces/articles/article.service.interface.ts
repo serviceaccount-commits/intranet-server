@@ -26,6 +26,10 @@ export interface ExternalClientArticle {
   /** Relevance score from the hybrid search service. Present only on
    *  search responses; consumers can sort by this descending. */
   _score?: number;
+  /** Passage of the article that best matched the query (search responses
+   *  only). The portal shows it under the title so the reader sees WHY an
+   *  article answered their question. */
+  matched_preview?: string | null;
 }
 
 export interface ExternalClientArticleDetail {

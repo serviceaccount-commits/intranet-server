@@ -863,6 +863,7 @@ export class ArticleService implements IArticleService {
         updated_at: h.article.updatedAt,
         article_property: h.article.article_property,
         _score: h.score,
+        matched_preview: h.matched_chunk_preview,
       }));
     }
 
@@ -926,6 +927,7 @@ export class ArticleService implements IArticleService {
         updated_at: h.article.updatedAt,
         article_property: h.article.article_property,
         _score: h.score,
+        matched_preview: h.matched_chunk_preview,
       }));
     }
 

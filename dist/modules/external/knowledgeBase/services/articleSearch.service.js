@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArticleSearchService = void 0;
+exports.buildPreview = buildPreview;
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const kb_collections_1 = require("../database/kb-collections");
@@ -49,6 +50,11 @@ function clientCopyToHitView(c) {
     };
 }
 const RRF_K = 60;
+// Semantic-first fusion: the vector ranking carries full weight so a question
+// or a paraphrase ("cómo cuido la piel después del botox") orders results by
+// meaning; the literal text ranking only nudges exact title/body matches up.
+const VECTOR_WEIGHT = Number(process.env['KB_SEARCH_VECTOR_WEIGHT'] ?? '1');
+const TEXT_WEIGHT = Number(process.env['KB_SEARCH_TEXT_WEIGHT'] ?? '0.5');
 const DEFAULT_LIMIT = 20;
 const VECTOR_TOP_K = 50;
 const TEXT_TOP_K = 50;
@@ -167,7 +173,7 @@ let ArticleSearchService = class ArticleSearchService {
             .map((c) => ({
             version_id: c.version_id,
             chunk_id: c._id,
-            preview: c.content.slice(0, PREVIEW_LENGTH),
+            content: c.content,
             similarity: cosineSimilarity(queryEmbedding, c.embedding),
         }));
         scored.sort((a, b) => b.similarity - a.similarity);
@@ -182,14 +188,21 @@ let ArticleSearchService = class ArticleSearchService {
         if (!passesGate)
             return [];
         const relevant = scored.filter((s) => s.similarity >= MIN_VECTOR_SIMILARITY);
-        // Collapse to best chunk per version_id, then take top K.
+        // Collapse to best chunk per version_id, then take top K. The preview is
+        // built only for the winners (an 800-token chunk rarely starts with the
+        // passage that answered the query).
         const seen = new Set();
         const best = [];
         for (const s of relevant) {
             if (seen.has(s.version_id))
                 continue;
             seen.add(s.version_id);
-            best.push(s);
+            best.push({
+                version_id: s.version_id,
+                chunk_id: s.chunk_id,
+                preview: buildPreview(s.content, query),
+                similarity: s.similarity,
+            });
             if (best.length >= VECTOR_TOP_K)
                 break;
         }
@@ -284,7 +297,7 @@ let ArticleSearchService = class ArticleSearchService {
         vec.forEach((v, i) => {
             const rank = i + 1;
             scores.set(v.version_id, {
-                score: 1 / (RRF_K + rank),
+                score: VECTOR_WEIGHT / (RRF_K + rank),
                 preview: v.preview,
                 vector_rank: rank,
                 text_rank: null,
@@ -294,12 +307,12 @@ let ArticleSearchService = class ArticleSearchService {
             const rank = i + 1;
             const existing = scores.get(t.version_id);
             if (existing) {
-                existing.score += 1 / (RRF_K + rank);
+                existing.score += TEXT_WEIGHT / (RRF_K + rank);
                 existing.text_rank = rank;
             }
             else {
                 scores.set(t.version_id, {
-                    score: 1 / (RRF_K + rank),
+                    score: TEXT_WEIGHT / (RRF_K + rank),
                     preview: null,
                     vector_rank: null,
                     text_rank: rank,
@@ -318,6 +331,69 @@ exports.ArticleSearchService = ArticleSearchService = __decorate([
     __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleRepository)),
     __metadata("design:paramtypes", [Object, Object])
 ], ArticleSearchService);
+// ─── Preview ────────────────────────────────────────────────────────────────────
+const STOPWORDS = new Set([
+    'que', 'qué', 'como', 'cómo', 'cual', 'cuál', 'cuales', 'cuáles', 'cuando', 'cuándo',
+    'donde', 'dónde', 'quien', 'quién', 'por', 'para', 'con', 'sin', 'sobre', 'entre',
+    'del', 'los', 'las', 'una', 'unos', 'unas', 'the', 'and', 'for', 'with', 'what',
+    'how', 'when', 'where', 'which', 'who', 'does', 'this', 'that', 'are', 'can',
+    'hay', 'hace', 'hacer', 'debe', 'deben', 'tiene', 'tienen', 'puede', 'pueden',
+    'ser', 'son', 'esta', 'estan', 'mas', 'pero', 'tambien',
+]);
+function foldDiacritics(text) {
+    return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+/** Picks the passage of `chunk` most likely to be the one that matched the
+ *  query: the sentence with the most query words (diacritics folded,
+ *  stopwords dropped), extended with its neighbours up to PREVIEW_LENGTH.
+ *  Falls back to the chunk start when no word hits (a purely semantic match). */
+function buildPreview(chunk, query) {
+    const text = (chunk ?? '').replace(/\s+/g, ' ').trim();
+    if (text.length <= PREVIEW_LENGTH)
+        return text;
+    const terms = Array.from(new Set(foldDiacritics(query)
+        .split(/[^a-z0-9ñ]+/)
+        .filter((w) => w.length >= 3 && !STOPWORDS.has(w))));
+    const sentences = text.split(/(?<=[.!?:;])\s+/).filter((s) => s.length > 0);
+    let bestIdx = -1;
+    let bestHits = 0;
+    if (terms.length > 0) {
+        sentences.forEach((sentence, i) => {
+            const folded = foldDiacritics(sentence);
+            const hits = terms.reduce((n, t) => (folded.includes(t) ? n + 1 : n), 0);
+            if (hits > bestHits) {
+                bestHits = hits;
+                bestIdx = i;
+            }
+        });
+    }
+    if (bestIdx < 0)
+        return `${text.slice(0, PREVIEW_LENGTH).trimEnd()}…`;
+    // Grow around the best sentence while the window still fits.
+    let start = bestIdx;
+    let end = bestIdx;
+    let out = sentences[bestIdx];
+    while (out.length < PREVIEW_LENGTH) {
+        const next = sentences[end + 1];
+        if (next && out.length + next.length + 1 <= PREVIEW_LENGTH) {
+            out = `${out} ${next}`;
+            end++;
+            continue;
+        }
+        const prev = sentences[start - 1];
+        if (prev && out.length + prev.length + 1 <= PREVIEW_LENGTH) {
+            out = `${prev} ${out}`;
+            start--;
+            continue;
+        }
+        break;
+    }
+    if (out.length > PREVIEW_LENGTH)
+        out = `${out.slice(0, PREVIEW_LENGTH).trimEnd()}…`;
+    const leading = start > 0 ? '… ' : '';
+    const trailing = end < sentences.length - 1 && !out.endsWith('…') ? ' …' : '';
+    return `${leading}${out}${trailing}`;
+}
 // ─── Math ───────────────────────────────────────────────────────────────────────
 function cosineSimilarity(a, b) {
     if (a.length !== b.length || a.length === 0)

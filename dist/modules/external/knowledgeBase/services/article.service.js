@@ -642,6 +642,7 @@ let ArticleService = class ArticleService {
                 updated_at: h.article.updatedAt,
                 article_property: h.article.article_property,
                 _score: h.score,
+                matched_preview: h.matched_chunk_preview,
             }));
         }
         const copies = await this.articleRepository.findClientFacingByTopicIds(topicIds);
@@ -693,6 +694,7 @@ let ArticleService = class ArticleService {
                 updated_at: h.article.updatedAt,
                 article_property: h.article.article_property,
                 _score: h.score,
+                matched_preview: h.matched_chunk_preview,
             }));
         }
         const copies = await this.articleRepository.findClientFacingByTopicIds(topicIds, true);
