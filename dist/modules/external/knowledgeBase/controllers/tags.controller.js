@@ -15,6 +15,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TagController = void 0;
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
+// The client identifies tags by `tag_id` (as in article details); the Mongo
+// document only has `_id`. Without it every add/remove/filter went out with
+// an undefined id — the editor took any second tag for a duplicate and
+// removals never reached the database.
+const toTagResponse = (tag) => ({ ...tag, tag_id: tag._id.toString() });
 let TagController = class TagController {
     tagService;
     constructor(tagService) {
@@ -23,11 +28,11 @@ let TagController = class TagController {
     async createTag(req, res) {
         let { tagName } = req.body;
         const tag = await this.tagService.createTag(tagName);
-        return res.json(tag);
+        return res.json(toTagResponse(tag));
     }
     async getTags(_req, res) {
         const tags = await this.tagService.getTags();
-        return res.json(tags);
+        return res.json(tags.map(toTagResponse));
     }
     async getTagById(req, res) {
         const { tagId } = req.params;
@@ -36,7 +41,7 @@ let TagController = class TagController {
             return;
         }
         const tag = await this.tagService.getTagById(tagId);
-        return res.json(tag);
+        return res.json(toTagResponse(tag));
     }
 };
 exports.TagController = TagController;
