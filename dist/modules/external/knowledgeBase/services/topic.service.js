@@ -23,18 +23,21 @@ const CreateTopicSchema_1 = require("../schema/topics/CreateTopicSchema");
 const UpdateTopicSchema_1 = require("../schema/topics/UpdateTopicSchema");
 const ManagedTopicSchemas_1 = require("../schema/manage/ManagedTopicSchemas");
 const kbAccess_service_1 = require("./kbAccess.service");
+const articleChunking_service_1 = require("./articleChunking.service");
 let TopicService = class TopicService {
     topicRepository;
     articleRepository;
     clientRepository;
     userRepository;
     kbAccess;
-    constructor(topicRepository, articleRepository, clientRepository, userRepository, kbAccess) {
+    chunkingService;
+    constructor(topicRepository, articleRepository, clientRepository, userRepository, kbAccess, chunkingService) {
         this.topicRepository = topicRepository;
         this.articleRepository = articleRepository;
         this.clientRepository = clientRepository;
         this.userRepository = userRepository;
         this.kbAccess = kbAccess;
+        this.chunkingService = chunkingService;
     }
     async createTopic(input) {
         const data = CreateTopicSchema_1.CreateTopicSchema.parse(input);
@@ -174,14 +177,79 @@ let TopicService = class TopicService {
     }
     async getTopics(clientId, userId) {
         await this.kbAccess.assertClientAccess(userId, clientId);
-        return this.topicRepository.findAllByClientId(clientId);
+        const topics = await this.topicRepository.findAllByClientId(clientId);
+        const visible = await this.kbAccess.filterVisibleTopics(userId, topics);
+        // Flag restricted folders so the tree can mark them
+        const access = await this.topicRepository.findAccessByTopicIds(visible.map((t) => t.topic_id));
+        return visible.map((t) => ({ ...t, is_restricted: access.has(t.topic_id) }));
     }
     async getTopicById(topicId, userId) {
         const topic = await this.topicRepository.findById(topicId);
         if (!topic)
             throw new NotFoundError_1.NotFoundError('Topic', topicId);
-        await this.kbAccess.assertClientAccess(userId, topic.client_id);
+        await this.kbAccess.assertTopicAccess(userId, topicId);
         return topic;
+    }
+    // ─── Intranet folder deletion (kb:topic:manage) ───────────────────────────────
+    /** The folder, its subfolders and the live (non-archived) articles inside. */
+    async collectFolderContents(topicId) {
+        const subfolderIds = await this.topicRepository.findAllDescendantIds(topicId);
+        const topicIds = [topicId, ...subfolderIds];
+        const latest = (await Promise.all(topicIds.map((id) => this.articleRepository.findAllLatestByTopicId(id)))).flat();
+        const articleIds = [
+            ...new Set(latest.filter((a) => a.article_status !== 'archived').map((a) => a.article_id)),
+        ];
+        return { topicIds, subfolderIds, articleIds };
+    }
+    async getTopicContents(topicId, userId) {
+        await this.kbAccess.assertTopicAccess(userId, topicId);
+        const { subfolderIds, articleIds } = await this.collectFolderContents(topicId);
+        return { subfolders: subfolderIds.length, articles: articleIds.length };
+    }
+    /**
+     * Deletes a folder and its subfolders (soft delete) and archives every
+     * article inside, so all of it stays recoverable: restoring an archived
+     * article brings its folder chain back (see ArticleService.restoreArticles).
+     */
+    async deleteTopic(topicId, userId) {
+        await this.kbAccess.assertTopicAccess(userId, topicId);
+        const { topicIds, subfolderIds, articleIds } = await this.collectFolderContents(topicId);
+        if (articleIds.length > 0) {
+            await this.articleRepository.archiveArticlesByIds(articleIds);
+            for (const articleId of articleIds) {
+                await this.chunkingService.clearArticle(articleId);
+            }
+        }
+        await this.topicRepository.softDeleteByIds(topicIds);
+        return { subfolders: subfolderIds.length, articles: articleIds.length };
+    }
+    // ─── Per-folder staff access (kb:topic:manage) ────────────────────────────────
+    async getTopicAccess(topicId, userId) {
+        const topic = await this.kbAccess.assertTopicAccess(userId, topicId);
+        const access = await this.topicRepository.findAccessByTopicIds([topicId]);
+        const allowedIds = [...(access.get(topicId) ?? [])];
+        const [allowed, staff] = await Promise.all([
+            this.topicRepository.findUsersByIds(allowedIds),
+            this.topicRepository.findClientStaff(topic.client_id),
+        ]);
+        return { restricted: allowedIds.length > 0, allowed, staff };
+    }
+    /** Replaces who may see the folder. An empty list removes the restriction. */
+    async setTopicAccess(topicId, userIds, userId) {
+        const topic = await this.kbAccess.assertTopicAccess(userId, topicId);
+        const unique = [...new Set(userIds)];
+        if (unique.length > 0) {
+            const staff = await this.topicRepository.findClientStaff(topic.client_id);
+            const staffIds = new Set(staff.map((u) => u.user_id));
+            if (unique.some((id) => !staffIds.has(id))) {
+                throw new ValidationError_1.ValidationError('Only staff with access to this client can be given access to its folders.');
+            }
+            // Restricting a folder you are not on would lock you out of it
+            if (!unique.includes(userId) && !(await this.kbAccess.hasFullAccess(userId))) {
+                throw new ValidationError_1.ValidationError('Keep yourself on the list, or you will lose access to this folder.');
+            }
+        }
+        await this.topicRepository.replaceAccess(topicId, unique);
     }
 };
 exports.TopicService = TopicService;
@@ -192,6 +260,8 @@ exports.TopicService = TopicService = __decorate([
     __param(2, (0, inversify_1.inject)(containerTypes_1.TYPES.IClientRepository)),
     __param(3, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserRepository)),
     __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbAccessService)),
-    __metadata("design:paramtypes", [Object, Object, Object, Object, kbAccess_service_1.KbAccessService])
+    __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleChunkingService)),
+    __metadata("design:paramtypes", [Object, Object, Object, Object, kbAccess_service_1.KbAccessService,
+        articleChunking_service_1.ArticleChunkingService])
 ], TopicService);
 //# sourceMappingURL=topic.service.js.map

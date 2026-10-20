@@ -8,6 +8,7 @@ import {
   BeforeInsert,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 
 import { v4 as uuidv4 } from 'uuid';
@@ -51,6 +52,10 @@ export class Topic extends BaseEntity {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  // Soft delete: TypeORM's find* calls skip these rows unless `withDeleted`.
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deleted_at!: Date | null;
 
   @BeforeInsert()
   addId() {

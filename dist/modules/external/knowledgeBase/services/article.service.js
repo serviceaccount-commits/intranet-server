@@ -282,7 +282,7 @@ let ArticleService = class ArticleService {
         if (clients.length === 0)
             return [];
         const clientIds = clients.map((c) => c.client_id);
-        const topics = await this.topicRepository.findAllByClientIds(clientIds);
+        const topics = await this.kbAccess.filterVisibleTopics(userId, await this.topicRepository.findAllByClientIds(clientIds));
         if (topics.length === 0)
             return [];
         const topicIds = topics.map((t) => t.topic_id);
@@ -301,7 +301,9 @@ let ArticleService = class ArticleService {
     async findArticlesByClientId(clientId, filters, userId) {
         await this.kbAccess.assertClientAccess(userId, clientId);
         const canSeeDraft = await this.getCanSeeDraft(userId);
-        const topics = await this.topicRepository.findAllByClientId(clientId);
+        // Deleted folders count too: their articles are archived and must still
+        // show under View Archived
+        const topics = await this.kbAccess.filterVisibleTopics(userId, await this.topicRepository.findAllByClientIdsWithDeleted([clientId]));
         if (topics.length === 0)
             return { articles: [], total: 0 };
         const topicIds = topics.map((t) => t.topic_id);
@@ -464,6 +466,21 @@ let ArticleService = class ArticleService {
             await this.chunkingService.clearArticle(articleId);
         }
     }
+    /** Brings back a deleted folder and any deleted ancestors, so an article
+     *  restored from a deleted folder lands somewhere visible again. */
+    async restoreDeletedFolderChain(topicId) {
+        const toRestore = [];
+        const seen = new Set();
+        let current = await this.topicRepository.findByIdWithDeleted(topicId);
+        while (current?.deleted_at && !seen.has(current.topic_id)) {
+            seen.add(current.topic_id);
+            toRestore.push(current.topic_id);
+            current = current.parent_topic_id
+                ? await this.topicRepository.findByIdWithDeleted(current.parent_topic_id)
+                : null;
+        }
+        await this.topicRepository.restoreByIds(toRestore);
+    }
     /** Restores archived articles: newest version comes back as 'unpublished'
      *  (never straight to the portal), older ones as 'outdated'. Re-chunks the
      *  restored version for the internal index; the client copy stays
@@ -487,6 +504,7 @@ let ArticleService = class ArticleService {
             }
             const latest = all.reduce((max, v) => (v.version > max.version ? v : max));
             await this.articleRepository.restoreArticleById(articleId, latest.article_version_id);
+            await this.restoreDeletedFolderChain(latest.topic_id);
             // S3-stored content re-chunks on the next save; inline content re-indexes
             // right away.
             await this.chunkingService.processVersionSafe(articleId, latest.article_version_id, latest.content ?? '', 'internal');

@@ -294,4 +294,16 @@ export interface KbTopic {
   user_id: string | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Set when the folder was deleted from the intranet (soft delete). */
+  deleted_at?: Date | null;
+  /** Only on the intranet tree response: the folder has an access allow-list. */
+  is_restricted?: boolean;
+}
+
+/** Staff member as listed in a folder's access dialog. */
+export interface KbTopicAccessUser {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  work_email: string;
 }

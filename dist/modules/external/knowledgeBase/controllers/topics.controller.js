@@ -15,6 +15,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TopicController = void 0;
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
+const AppError_1 = require("../../../../shared/errors/AppError");
+const sendError = (res, error) => {
+    if (error instanceof AppError_1.AppError) {
+        return res.status(error.statusCode).json({ message: error.message });
+    }
+    throw error;
+};
 let TopicController = class TopicController {
     topicService;
     constructor(topicService) {
@@ -63,6 +70,67 @@ let TopicController = class TopicController {
         }
         const topic = await this.topicService.getTopicById(topicId, userId);
         return res.json(topic);
+    }
+    async getTopicContents(req, res) {
+        const { topicId } = req.params;
+        const userId = req.user?.id;
+        if (!topicId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            res.json(await this.topicService.getTopicContents(topicId, userId));
+        }
+        catch (error) {
+            sendError(res, error);
+        }
+    }
+    async deleteTopic(req, res) {
+        const { topicId } = req.params;
+        const userId = req.user?.id;
+        if (!topicId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            res.json(await this.topicService.deleteTopic(topicId, userId));
+        }
+        catch (error) {
+            sendError(res, error);
+        }
+    }
+    async getTopicAccess(req, res) {
+        const { topicId } = req.params;
+        const userId = req.user?.id;
+        if (!topicId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            res.json(await this.topicService.getTopicAccess(topicId, userId));
+        }
+        catch (error) {
+            sendError(res, error);
+        }
+    }
+    async setTopicAccess(req, res) {
+        const { topicId } = req.params;
+        const userId = req.user?.id;
+        const { userIds } = req.body ?? {};
+        if (!topicId ||
+            !userId ||
+            !Array.isArray(userIds) ||
+            userIds.some((id) => typeof id !== 'string')) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            await this.topicService.setTopicAccess(topicId, userIds, userId);
+            res.sendStatus(204);
+        }
+        catch (error) {
+            sendError(res, error);
+        }
     }
 };
 exports.TopicController = TopicController;

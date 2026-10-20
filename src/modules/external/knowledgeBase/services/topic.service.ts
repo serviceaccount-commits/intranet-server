@@ -5,7 +5,7 @@ import { ITopicRepository } from '../interfaces/topics/topic.repository.interfac
 import { IArticleRepository } from '../interfaces/articles/article.repository.interface';
 import { IClientRepository } from '../interfaces/clients/client.repository.interface';
 import { IUserRepository } from '../../../internal/users/interfaces/users/user.repository.interface';
-import { KbTopic } from '../database/kb-domain.types';
+import { KbTopic, KbTopicAccessUser } from '../database/kb-domain.types';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
 import { AuthenticationError } from '../../../../shared/errors/AuthenticationError';
 import { ValidationError } from '../../../../shared/errors/ValidationError';
@@ -19,6 +19,7 @@ import {
   UpdateManagedTopicSchema,
 } from '../schema/manage/ManagedTopicSchemas';
 import { KbAccessService } from './kbAccess.service';
+import { ArticleChunkingService } from './articleChunking.service';
 
 @injectable()
 export class TopicService implements ITopicService {
@@ -33,6 +34,8 @@ export class TopicService implements ITopicService {
     private userRepository: IUserRepository,
     @inject(TYPES.IKbAccessService)
     private kbAccess: KbAccessService,
+    @inject(TYPES.IArticleChunkingService)
+    private chunkingService: ArticleChunkingService,
   ) {}
 
   async createTopic(input: CreateTopicInput): Promise<KbTopic> {
@@ -214,13 +217,103 @@ export class TopicService implements ITopicService {
 
   async getTopics(clientId: string, userId: string): Promise<KbTopic[]> {
     await this.kbAccess.assertClientAccess(userId, clientId);
-    return this.topicRepository.findAllByClientId(clientId);
+    const topics = await this.topicRepository.findAllByClientId(clientId);
+    const visible = await this.kbAccess.filterVisibleTopics(userId, topics);
+    // Flag restricted folders so the tree can mark them
+    const access = await this.topicRepository.findAccessByTopicIds(
+      visible.map((t) => t.topic_id),
+    );
+    return visible.map((t) => ({ ...t, is_restricted: access.has(t.topic_id) }));
   }
 
   async getTopicById(topicId: string, userId: string): Promise<KbTopic> {
     const topic = await this.topicRepository.findById(topicId);
     if (!topic) throw new NotFoundError('Topic', topicId);
-    await this.kbAccess.assertClientAccess(userId, topic.client_id);
+    await this.kbAccess.assertTopicAccess(userId, topicId);
     return topic;
+  }
+
+  // ─── Intranet folder deletion (kb:topic:manage) ───────────────────────────────
+
+  /** The folder, its subfolders and the live (non-archived) articles inside. */
+  private async collectFolderContents(topicId: string) {
+    const subfolderIds = await this.topicRepository.findAllDescendantIds(topicId);
+    const topicIds = [topicId, ...subfolderIds];
+    const latest = (
+      await Promise.all(topicIds.map((id) => this.articleRepository.findAllLatestByTopicId(id)))
+    ).flat();
+    const articleIds = [
+      ...new Set(latest.filter((a) => a.article_status !== 'archived').map((a) => a.article_id)),
+    ];
+    return { topicIds, subfolderIds, articleIds };
+  }
+
+  async getTopicContents(
+    topicId: string,
+    userId: string,
+  ): Promise<{ subfolders: number; articles: number }> {
+    await this.kbAccess.assertTopicAccess(userId, topicId);
+    const { subfolderIds, articleIds } = await this.collectFolderContents(topicId);
+    return { subfolders: subfolderIds.length, articles: articleIds.length };
+  }
+
+  /**
+   * Deletes a folder and its subfolders (soft delete) and archives every
+   * article inside, so all of it stays recoverable: restoring an archived
+   * article brings its folder chain back (see ArticleService.restoreArticles).
+   */
+  async deleteTopic(
+    topicId: string,
+    userId: string,
+  ): Promise<{ subfolders: number; articles: number }> {
+    await this.kbAccess.assertTopicAccess(userId, topicId);
+    const { topicIds, subfolderIds, articleIds } = await this.collectFolderContents(topicId);
+
+    if (articleIds.length > 0) {
+      await this.articleRepository.archiveArticlesByIds(articleIds);
+      for (const articleId of articleIds) {
+        await this.chunkingService.clearArticle(articleId);
+      }
+    }
+    await this.topicRepository.softDeleteByIds(topicIds);
+    return { subfolders: subfolderIds.length, articles: articleIds.length };
+  }
+
+  // ─── Per-folder staff access (kb:topic:manage) ────────────────────────────────
+
+  async getTopicAccess(
+    topicId: string,
+    userId: string,
+  ): Promise<{ restricted: boolean; allowed: KbTopicAccessUser[]; staff: KbTopicAccessUser[] }> {
+    const topic = await this.kbAccess.assertTopicAccess(userId, topicId);
+    const access = await this.topicRepository.findAccessByTopicIds([topicId]);
+    const allowedIds = [...(access.get(topicId) ?? [])];
+    const [allowed, staff] = await Promise.all([
+      this.topicRepository.findUsersByIds(allowedIds),
+      this.topicRepository.findClientStaff(topic.client_id),
+    ]);
+    return { restricted: allowedIds.length > 0, allowed, staff };
+  }
+
+  /** Replaces who may see the folder. An empty list removes the restriction. */
+  async setTopicAccess(topicId: string, userIds: string[], userId: string): Promise<void> {
+    const topic = await this.kbAccess.assertTopicAccess(userId, topicId);
+    const unique = [...new Set(userIds)];
+
+    if (unique.length > 0) {
+      const staff = await this.topicRepository.findClientStaff(topic.client_id);
+      const staffIds = new Set(staff.map((u) => u.user_id));
+      if (unique.some((id) => !staffIds.has(id))) {
+        throw new ValidationError(
+          'Only staff with access to this client can be given access to its folders.',
+        );
+      }
+      // Restricting a folder you are not on would lock you out of it
+      if (!unique.includes(userId) && !(await this.kbAccess.hasFullAccess(userId))) {
+        throw new ValidationError('Keep yourself on the list, or you will lose access to this folder.');
+      }
+    }
+
+    await this.topicRepository.replaceAccess(topicId, unique);
   }
 }

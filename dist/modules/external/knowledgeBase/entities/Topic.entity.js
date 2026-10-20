@@ -28,6 +28,8 @@ let Topic = class Topic extends typeorm_1.BaseEntity {
     parent_topic_id;
     createdAt;
     updatedAt;
+    // Soft delete: TypeORM's find* calls skip these rows unless `withDeleted`.
+    deleted_at;
     addId() {
         this.topic_id = (0, uuid_1.v4)();
     }
@@ -80,6 +82,10 @@ __decorate([
     (0, typeorm_1.UpdateDateColumn)(),
     __metadata("design:type", Date)
 ], Topic.prototype, "updatedAt", void 0);
+__decorate([
+    (0, typeorm_1.DeleteDateColumn)({ type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Object)
+], Topic.prototype, "deleted_at", void 0);
 __decorate([
     (0, typeorm_1.BeforeInsert)(),
     __metadata("design:type", Function),
