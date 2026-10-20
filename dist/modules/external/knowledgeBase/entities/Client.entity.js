@@ -123,7 +123,7 @@ __decorate([
     __metadata("design:type", String)
 ], Client.prototype, "currency", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true, unique: true }),
+    (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Client.prototype, "address", void 0);
 __decorate([
@@ -131,11 +131,11 @@ __decorate([
     __metadata("design:type", String)
 ], Client.prototype, "primary_contact_name", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true, unique: true }),
+    (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Client.prototype, "primary_contact_email", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true, unique: true }),
+    (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Client.prototype, "primary_contact_phone", void 0);
 __decorate([

@@ -23,9 +23,24 @@ export class ClientController {
     }
     const input: CreateClientInput = req.body;
 
-    await this.clientService.createClient(input, userId);
-
-    res.sendStatus(201);
+    // Same error mapping as updateClient: a failed create used to surface as
+    // a bare 500, and the dialog had nothing to tell the user
+    try {
+      await this.clientService.createClient(input, userId);
+      res.sendStatus(201);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ message: 'Validation failed', issues: error.issues });
+        return;
+      }
+      if (error instanceof ConflictError) {
+        res.status(409).json({ message: error.message });
+        return;
+      }
+      res.status(400).json({
+        message: error instanceof Error ? error.message : 'Unexpected error',
+      });
+    }
   }
 
   async updateClient(req: Request, res: Response) {

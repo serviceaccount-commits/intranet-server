@@ -84,16 +84,16 @@ export class Client extends BaseEntity {
   })
   currency!: string;
 
-  @Column({ nullable: true, unique: true })
+  @Column({ nullable: true })
   address!: string;
 
   @Column({ nullable: true })
   primary_contact_name!: string;
 
-  @Column({ nullable: true, unique: true })
+  @Column({ nullable: true })
   primary_contact_email!: string;
 
-  @Column({ nullable: true, unique: true })
+  @Column({ nullable: true })
   primary_contact_phone!: string;
 
   @BeforeInsert()
