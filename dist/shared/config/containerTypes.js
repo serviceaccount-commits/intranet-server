@@ -36,6 +36,7 @@ const TYPES = {
     ICustomFieldService: Symbol.for('ICustomFieldService'),
     IStaffDirectoryOrderRepository: Symbol.for('IStaffDirectoryOrderRepository'),
     IStaffDirectoryOrderService: Symbol.for('IStaffDirectoryOrderService'),
+    ITimeTrackerService: Symbol.for('ITimeTrackerService'),
     ICourseRepository: Symbol.for('ICourseRepository'),
     ICourseService: Symbol.for('ICourseService'),
     ICourseUserValueRepository: Symbol.for('ICourseUserValueRepository'),

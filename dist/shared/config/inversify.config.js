@@ -53,6 +53,8 @@ const customField_controller_1 = require("../../modules/internal/users/controlle
 const staffDirectoryOrder_repository_1 = require("../../modules/external/humanResources/repositories/staffDirectoryOrder.repository");
 const staffDirectoryOrder_service_1 = require("../../modules/external/humanResources/services/staffDirectoryOrder.service");
 const staffDirectoryOrders_controller_1 = require("../../modules/external/humanResources/controllers/staffDirectoryOrders.controller");
+const timeTracker_service_1 = require("../../modules/internal/timeTracking/services/timeTracker.service");
+const timeTracker_controller_1 = require("../../modules/internal/timeTracking/controllers/timeTracker.controller");
 const externalValidation_service_1 = require("../../modules/internal/users/services/externalValidation.service");
 const course_repository_1 = require("../../modules/external/training/repositories/course.repository");
 const trainingTopic_repository_1 = require("../../modules/external/training/repositories/trainingTopic.repository");
@@ -180,6 +182,10 @@ container
 container
     .bind(staffDirectoryOrders_controller_1.StaffDirectoryOrderController)
     .toSelf();
+container
+    .bind(containerTypes_1.TYPES.ITimeTrackerService)
+    .to(timeTracker_service_1.TimeTrackerService);
+container.bind(timeTracker_controller_1.TimeTrackerController).toSelf();
 container
     .bind(containerTypes_1.TYPES.ExternalValidationService)
     .to(externalValidation_service_1.ExternalValidationService);

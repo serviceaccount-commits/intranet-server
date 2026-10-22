@@ -25,6 +25,7 @@ exports.PERMISSIONS = [
     { permission_id: 'training:standalone:exam:manage', app_module: 'training' },
     { permission_id: 'training:standalone:exam:approve', app_module: 'training' },
     { permission_id: 'training:exam:manage:attempts', app_module: 'training' },
+    { permission_id: 'timetracking:access', app_module: 'time-tracking' },
     { permission_id: 'roles:access', app_module: 'admin' },
     { permission_id: 'roles:manage', app_module: 'admin' },
     { permission_id: 'login', app_module: 'admin' },

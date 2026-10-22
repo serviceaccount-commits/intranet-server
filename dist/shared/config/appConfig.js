@@ -62,6 +62,11 @@ const loadConfig = () => {
             clientSecret: process.env['GOOGLE_OAUTH_CLIENT_SECRET'] || '',
             callbackURL: process.env['GOOGLE_OAUTH_CALLBACK_URL'] || '',
         },
+        // Paricus Time Tracker (server-to-server). Empty = the time-tracking module answers 503.
+        timeTracker: {
+            apiUrl: (process.env['TIME_TRACKER_API_URL'] || '').replace(/\/+$/, ''),
+            apiKey: process.env['TIME_TRACKER_API_KEY'] || '',
+        },
     };
     if (!config.jwt.privateKey || !config.jwt.publicKey) {
         throw new EnvironmentError_1.EnvironmentError('JWT private or public key is missing');

@@ -34,6 +34,8 @@ const adminApiKey_middleware_1 = require("../modules/internal/auth/middlewares/a
 const writeApiKey_middleware_1 = require("../modules/internal/auth/middlewares/writeApiKey.middleware");
 const documents_router_1 = require("../modules/internal/documents/api/documents.router");
 const auth_middleware_1 = require("../modules/internal/auth/middlewares/auth.middleware");
+const permission_middleware_1 = require("../modules/internal/auth/middlewares/permission.middleware");
+const timeTracking_router_1 = require("../modules/internal/timeTracking/api/timeTracking.router");
 const apiLayerRouter = (0, express_1.Router)();
 apiLayerRouter.use('/v1/users', auth_middleware_1.authenticateJWT, users_router_1.usersRouter);
 apiLayerRouter.use('/v1/roles', auth_middleware_1.authenticateJWT, roles_router_1.rolesRouter);
@@ -61,6 +63,7 @@ apiLayerRouter.use('/v1/external/admin/articles', adminApiKey_middleware_1.verif
 apiLayerRouter.use('/v1/external/admin/topics', adminApiKey_middleware_1.verifyAdminApiKey, admin_topics_router_1.adminTopicsRouter);
 apiLayerRouter.use('/v1/external/manage/articles', writeApiKey_middleware_1.verifyWriteApiKey, manage_articles_router_1.manageArticlesRouter);
 apiLayerRouter.use('/v1/external/manage/topics', writeApiKey_middleware_1.verifyWriteApiKey, manage_topics_router_1.manageTopicsRouter);
+apiLayerRouter.use('/v1/time-tracking', auth_middleware_1.authenticateJWT, (0, permission_middleware_1.checkPermission)('timetracking:access'), timeTracking_router_1.timeTrackingRouter);
 apiLayerRouter.use('/v1/auth', auth_router_1.authRouter);
 apiLayerRouter.use('/v1/documents', documents_router_1.documentsRouter);
 exports.default = apiLayerRouter;

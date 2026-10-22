@@ -29,6 +29,7 @@ __decorate([
             'announcements',
             'training',
             'profile',
+            'time-tracking',
             'admin',
         ],
         default: 'knowledge-base',
