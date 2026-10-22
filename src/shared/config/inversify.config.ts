@@ -77,6 +77,9 @@ import { StaffDirectoryOrderRepository } from '../../modules/external/humanResou
 import { IStaffDirectoryOrderService } from '../../modules/external/humanResources/interfaces/staffDirectoryOrders/staffDirectoryOrder.service.interface';
 import { StaffDirectoryOrderService } from '../../modules/external/humanResources/services/staffDirectoryOrder.service';
 import { StaffDirectoryOrderController } from '../../modules/external/humanResources/controllers/staffDirectoryOrders.controller';
+import { ITimeTrackerService } from '../../modules/internal/timeTracking/interfaces/timeTracker.service.interface';
+import { TimeTrackerService } from '../../modules/internal/timeTracking/services/timeTracker.service';
+import { TimeTrackerController } from '../../modules/internal/timeTracking/controllers/timeTracker.controller';
 import { ExternalValidationService } from '../../modules/internal/users/services/externalValidation.service';
 import { ICourseRepository } from '../../modules/external/training/interfaces/courses/course.repository.interface';
 import { CourseRepository } from '../../modules/external/training/repositories/course.repository';
@@ -246,6 +249,11 @@ container
 container
   .bind<StaffDirectoryOrderController>(StaffDirectoryOrderController)
   .toSelf();
+
+container
+  .bind<ITimeTrackerService>(TYPES.ITimeTrackerService)
+  .to(TimeTrackerService);
+container.bind<TimeTrackerController>(TimeTrackerController).toSelf();
 
 container
   .bind<ExternalValidationService>(TYPES.ExternalValidationService)

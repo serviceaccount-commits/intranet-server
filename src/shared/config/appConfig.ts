@@ -49,6 +49,10 @@ interface AppConfig {
     clientSecret: string;
     callbackURL: string;
   };
+  timeTracker: {
+    apiUrl: string;
+    apiKey: string;
+  };
 }
 
 const readKeyFile = (filePath: string | undefined): string => {
@@ -106,6 +110,11 @@ const loadConfig = (): AppConfig => {
       clientId: process.env['GOOGLE_OAUTH_CLIENT_ID'] || '',
       clientSecret: process.env['GOOGLE_OAUTH_CLIENT_SECRET'] || '',
       callbackURL: process.env['GOOGLE_OAUTH_CALLBACK_URL'] || '',
+    },
+    // Paricus Time Tracker (server-to-server). Empty = the time-tracking module answers 503.
+    timeTracker: {
+      apiUrl: (process.env['TIME_TRACKER_API_URL'] || '').replace(/\/+$/, ''),
+      apiKey: process.env['TIME_TRACKER_API_KEY'] || '',
     },
   };
 

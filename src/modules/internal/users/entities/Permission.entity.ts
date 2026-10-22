@@ -13,6 +13,7 @@ export class Permission extends BaseEntity {
       'announcements',
       'training',
       'profile',
+      'time-tracking',
       'admin',
     ],
     default: 'knowledge-base',

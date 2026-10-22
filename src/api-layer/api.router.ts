@@ -33,6 +33,8 @@ import { verifyAdminApiKey } from '../modules/internal/auth/middlewares/adminApi
 import { verifyWriteApiKey } from '../modules/internal/auth/middlewares/writeApiKey.middleware';
 import { documentsRouter } from '../modules/internal/documents/api/documents.router';
 import { authenticateJWT } from '../modules/internal/auth/middlewares/auth.middleware';
+import { checkPermission } from '../modules/internal/auth/middlewares/permission.middleware';
+import { timeTrackingRouter } from '../modules/internal/timeTracking/api/timeTracking.router';
 
 const apiLayerRouter = Router();
 
@@ -62,6 +64,12 @@ apiLayerRouter.use('/v1/external/admin/articles', verifyAdminApiKey, adminRouter
 apiLayerRouter.use('/v1/external/admin/topics', verifyAdminApiKey, adminTopicsRouter);
 apiLayerRouter.use('/v1/external/manage/articles', verifyWriteApiKey, manageArticlesRouter);
 apiLayerRouter.use('/v1/external/manage/topics', verifyWriteApiKey, manageTopicsRouter);
+apiLayerRouter.use(
+  '/v1/time-tracking',
+  authenticateJWT,
+  checkPermission('timetracking:access'),
+  timeTrackingRouter,
+);
 apiLayerRouter.use('/v1/auth', authRouter);
 apiLayerRouter.use('/v1/documents', documentsRouter);
 
