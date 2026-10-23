@@ -30,6 +30,7 @@ import { Assignment } from '../entities/Assignment.entity';
 import { FilterUserInput } from '../schema/users/FilterUserSchema';
 import { BusinessValidationError } from '../../../../shared/errors/BusinessValidationError';
 import { CompleteUserProfile } from '../types/Users.types';
+import { provisionTrackerUser } from '../../timeTracking/services/provisionTrackerUser';
 
 import { google } from 'googleapis';
 
@@ -138,7 +139,7 @@ export class UserService implements IUserService {
       businessErrors,
     );
 
-    return await AppDataSource.manager.transaction(async (_t) => {
+    const created = await AppDataSource.manager.transaction(async (_t) => {
       const role = await this.roleRepository.findById(userData.roleId);
       if (!role) throw new NotFoundError('Role', validatedData.roleId);
 
@@ -262,6 +263,15 @@ export class UserService implements IUserService {
 
       return user;
     });
+
+    // After the commit: mirror the account into the Time Tracker (best-effort).
+    await provisionTrackerUser(
+      created.work_email,
+      created.first_name,
+      created.last_name,
+    );
+
+    return created;
   }
 
   async updateUserLastActivity(userId: string): Promise<void> {

@@ -30,6 +30,7 @@ const externalValidation_service_1 = require("./externalValidation.service");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 const InvalidDataFormatError_1 = require("../../../../shared/errors/InvalidDataFormatError");
 const BusinessValidationError_1 = require("../../../../shared/errors/BusinessValidationError");
+const provisionTrackerUser_1 = require("../../timeTracking/services/provisionTrackerUser");
 const googleapis_1 = require("googleapis");
 let UserService = class UserService {
     userRepository;
@@ -97,7 +98,7 @@ let UserService = class UserService {
         const businessErrors = {};
         const validatedData = CreateUserSchema_1.CreateUserSchema.parse(userData);
         await this._validateContactInfoExternally(validatedData, null, businessErrors);
-        return await data_source_1.AppDataSource.manager.transaction(async (_t) => {
+        const created = await data_source_1.AppDataSource.manager.transaction(async (_t) => {
             const role = await this.roleRepository.findById(userData.roleId);
             if (!role)
                 throw new NotFoundError_1.NotFoundError('Role', validatedData.roleId);
@@ -182,6 +183,9 @@ let UserService = class UserService {
             }
             return user;
         });
+        // After the commit: mirror the account into the Time Tracker (best-effort).
+        await (0, provisionTrackerUser_1.provisionTrackerUser)(created.work_email, created.first_name, created.last_name);
+        return created;
     }
     async updateUserLastActivity(userId) {
         await this.userRepository.updateUserLastActivity(userId);
