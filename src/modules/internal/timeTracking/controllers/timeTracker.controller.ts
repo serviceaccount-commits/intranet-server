@@ -96,6 +96,38 @@ export class TimeTrackerController {
     });
   }
 
+  async submit(req: Request, res: Response) {
+    await this.act(req, res, {
+      method: 'POST',
+      path: '/me/submissions',
+      body: req.body,
+      idempotencyKey: this.idempotencyKey(req),
+    });
+  }
+
+  async requestUnlock(req: Request, res: Response) {
+    await this.act(req, res, {
+      method: 'POST',
+      path: '/unlock-requests',
+      body: req.body,
+      idempotencyKey: this.idempotencyKey(req),
+    });
+  }
+
+  async unlockReasons(req: Request, res: Response) {
+    await this.act(req, res, {
+      method: 'GET',
+      path: '/unlock-reasons',
+    });
+  }
+
+  async handoff(req: Request, res: Response) {
+    await this.act(req, res, {
+      method: 'POST',
+      path: '/handoff',
+    });
+  }
+
   async startTimer(req: Request, res: Response) {
     await this.act(req, res, {
       method: 'POST',

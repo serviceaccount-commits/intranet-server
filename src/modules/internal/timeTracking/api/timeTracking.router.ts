@@ -33,6 +33,22 @@ timeTrackingRouter.delete(
   handle((req, res) => controller.deleteEntry(req, res)),
 );
 timeTrackingRouter.post(
+  '/me/submissions',
+  handle((req, res) => controller.submit(req, res)),
+);
+timeTrackingRouter.post(
+  '/unlock-requests',
+  handle((req, res) => controller.requestUnlock(req, res)),
+);
+timeTrackingRouter.get(
+  '/unlock-reasons',
+  handle((req, res) => controller.unlockReasons(req, res)),
+);
+timeTrackingRouter.post(
+  '/handoff',
+  handle((req, res) => controller.handoff(req, res)),
+);
+timeTrackingRouter.post(
   '/me/timer/start',
   handle((req, res) => controller.startTimer(req, res)),
 );

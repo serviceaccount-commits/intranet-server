@@ -94,6 +94,34 @@ let TimeTrackerController = class TimeTrackerController {
             query: { version: String(version) },
         });
     }
+    async submit(req, res) {
+        await this.act(req, res, {
+            method: 'POST',
+            path: '/me/submissions',
+            body: req.body,
+            idempotencyKey: this.idempotencyKey(req),
+        });
+    }
+    async requestUnlock(req, res) {
+        await this.act(req, res, {
+            method: 'POST',
+            path: '/unlock-requests',
+            body: req.body,
+            idempotencyKey: this.idempotencyKey(req),
+        });
+    }
+    async unlockReasons(req, res) {
+        await this.act(req, res, {
+            method: 'GET',
+            path: '/unlock-reasons',
+        });
+    }
+    async handoff(req, res) {
+        await this.act(req, res, {
+            method: 'POST',
+            path: '/handoff',
+        });
+    }
     async startTimer(req, res) {
         await this.act(req, res, {
             method: 'POST',
