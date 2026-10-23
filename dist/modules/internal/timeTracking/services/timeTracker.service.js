@@ -50,7 +50,8 @@ let TimeTrackerService = class TimeTrackerService {
             'X-API-Key': apiKey,
             'X-User-Email': email,
         };
-        if (request.body !== undefined) {
+        // A FormData body sets its own multipart Content-Type (with the boundary).
+        if (request.form === undefined && request.body !== undefined) {
             headers['Content-Type'] = 'application/json';
         }
         if (request.idempotencyKey) {
@@ -61,7 +62,8 @@ let TimeTrackerService = class TimeTrackerService {
             response = await fetch(url, {
                 method: request.method,
                 headers,
-                body: request.body !== undefined ? JSON.stringify(request.body) : undefined,
+                body: request.form ??
+                    (request.body !== undefined ? JSON.stringify(request.body) : undefined),
             });
         }
         catch (error) {

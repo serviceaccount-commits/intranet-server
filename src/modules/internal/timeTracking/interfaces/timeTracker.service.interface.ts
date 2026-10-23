@@ -4,6 +4,8 @@ export interface TimeTrackerRequest {
   path: string;
   query?: Record<string, string>;
   body?: unknown;
+  /** Multipart body (a problem report with images), sent as is instead of `body`. */
+  form?: FormData;
   /** Forwarded as Idempotency-Key (the tracker requires it on creates and timer calls). */
   idempotencyKey?: string;
 }

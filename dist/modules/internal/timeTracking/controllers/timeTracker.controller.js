@@ -123,6 +123,21 @@ let TimeTrackerController = class TimeTrackerController {
             path: '/handoff',
         });
     }
+    /** "Report a problem" from the module: multipart (message, page, up to 3 images) as the tracker takes it. */
+    async reportProblem(req, res) {
+        const files = req.files ?? [];
+        const form = new FormData();
+        form.set('message', String(req.body?.message ?? ''));
+        const page = req.body?.page;
+        if (typeof page === 'string' && page.trim()) {
+            form.set('page', page.trim().slice(0, 300));
+        }
+        for (const file of files) {
+            form.append('images', new Blob([new Uint8Array(file.buffer)], { type: file.mimetype }), file.originalname || 'image');
+        }
+        // Types and magic bytes are checked by the tracker; its 422 passes through untouched.
+        await this.act(req, res, { method: 'POST', path: '/error-reports', form });
+    }
     async startTimer(req, res) {
         await this.act(req, res, {
             method: 'POST',

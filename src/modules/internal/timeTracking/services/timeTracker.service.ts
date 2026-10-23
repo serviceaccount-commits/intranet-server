@@ -48,7 +48,8 @@ export class TimeTrackerService implements ITimeTrackerService {
       'X-API-Key': apiKey,
       'X-User-Email': email,
     };
-    if (request.body !== undefined) {
+    // A FormData body sets its own multipart Content-Type (with the boundary).
+    if (request.form === undefined && request.body !== undefined) {
       headers['Content-Type'] = 'application/json';
     }
     if (request.idempotencyKey) {
@@ -61,7 +62,8 @@ export class TimeTrackerService implements ITimeTrackerService {
         method: request.method,
         headers,
         body:
-          request.body !== undefined ? JSON.stringify(request.body) : undefined,
+          request.form ??
+          (request.body !== undefined ? JSON.stringify(request.body) : undefined),
       });
     } catch (error) {
       logger.error('Time tracker request failed:', error);
