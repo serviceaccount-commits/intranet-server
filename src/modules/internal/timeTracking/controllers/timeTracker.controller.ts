@@ -117,7 +117,8 @@ export class TimeTrackerController {
   async unlockReasons(req: Request, res: Response) {
     await this.act(req, res, {
       method: 'GET',
-      path: '/unlock-reasons',
+      path: '/edit-reasons',
+      query: { applies_to: 'unlock' },
     });
   }
 
