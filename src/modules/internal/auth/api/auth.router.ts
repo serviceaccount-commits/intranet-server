@@ -6,6 +6,7 @@ import appConfig from '../../../../shared/config/appConfig';
 import { AuthController } from '../controllers/auth.controller';
 import { TYPES } from '../../../../shared/config/containerTypes';
 import { AuthService } from '../services/auth.service';
+import { JwtUserPayload } from '../types/jwtUserPayload.interface';
 import {
   ACCESS_TOKEN_COOKIE_OPTIONS,
   authenticateJWT,
@@ -50,6 +51,9 @@ authRouter.get('/google', (req: Request, res: Response, next: NextFunction) => {
   passport.authenticate('google', {
     ...GOOGLE_AUTH_OPTIONS,
     state: returnTo,
+    // After a rejected account the login page asks Google for the account chooser,
+    // otherwise Google signs the same account in again.
+    ...(req.query['prompt'] === 'select_account' ? { prompt: 'select_account' } : {}),
   })(req, res, next);
 });
 
@@ -57,11 +61,21 @@ authRouter.get(
   '/google/callback',
   (req: Request, res: Response, next: NextFunction) => {
     const frontendOrigin = resolveFrontendOrigin(req.query['state']);
-    passport.authenticate('google', {
-      failureRedirect: `${frontendOrigin}/login?error=true`,
-      failWithError: true,
-      session: false,
-    })(req, res, next);
+    passport.authenticate(
+      'google',
+      { session: false },
+      (error: unknown, user: JwtUserPayload | false, info?: { email?: string }) => {
+        if (error) return next(error);
+        if (!user) {
+          // Tell the login page which Google account was refused so the person can switch accounts.
+          const params = new URLSearchParams({ error: 'not_registered' });
+          if (info?.email) params.set('email', info.email);
+          return res.redirect(`${frontendOrigin}/login?${params.toString()}`);
+        }
+        req.user = user;
+        next();
+      },
+    )(req, res, next);
   },
   async (req: Request, res: Response, _next: NextFunction) => {
     const frontendOrigin = resolveFrontendOrigin(req.query['state']);

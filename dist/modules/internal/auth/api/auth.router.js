@@ -44,14 +44,25 @@ authRouter.get('/google', (req, res, next) => {
     passport_1.default.authenticate('google', {
         ...GOOGLE_AUTH_OPTIONS,
         state: returnTo,
+        // After a rejected account the login page asks Google for the account chooser,
+        // otherwise Google signs the same account in again.
+        ...(req.query['prompt'] === 'select_account' ? { prompt: 'select_account' } : {}),
     })(req, res, next);
 });
 authRouter.get('/google/callback', (req, res, next) => {
     const frontendOrigin = resolveFrontendOrigin(req.query['state']);
-    passport_1.default.authenticate('google', {
-        failureRedirect: `${frontendOrigin}/login?error=true`,
-        failWithError: true,
-        session: false,
+    passport_1.default.authenticate('google', { session: false }, (error, user, info) => {
+        if (error)
+            return next(error);
+        if (!user) {
+            // Tell the login page which Google account was refused so the person can switch accounts.
+            const params = new URLSearchParams({ error: 'not_registered' });
+            if (info?.email)
+                params.set('email', info.email);
+            return res.redirect(`${frontendOrigin}/login?${params.toString()}`);
+        }
+        req.user = user;
+        next();
     })(req, res, next);
 }, async (req, res, _next) => {
     const frontendOrigin = resolveFrontendOrigin(req.query['state']);

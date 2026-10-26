@@ -43,8 +43,11 @@ export const configurePassport = async () => {
 
           const user = await userRepository.findUserByEmail(email);
           if (!user) {
+            // Logged so support can tell who is stuck (usually a different Google account than the registered one).
+            logger.warn(`Google sign-in rejected: no user with work_email ${email}`);
             return done(null, false, {
               message: 'Could not process user profile.',
+              email,
             });
           }
 
