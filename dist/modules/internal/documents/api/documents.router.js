@@ -15,13 +15,49 @@ const client_s3_1 = require("@aws-sdk/client-s3");
 const s3_client_1 = require("../clients/s3.client");
 const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
 const appConfig_1 = __importDefault(require("../../../../shared/config/appConfig"));
+const auth_middleware_1 = require("../../auth/middlewares/auth.middleware");
 const documentController = inversify_config_1.container.get(documents_controller_1.DocumentController);
 const documentsRouter = (0, express_1.Router)();
 exports.documentsRouter = documentsRouter;
 const storage = multer_1.default.memoryStorage();
-const upload = (0, multer_1.default)({ storage });
-documentsRouter.post('/upload-image', upload.single('upload'), async (req, res, next) => {
+// Only raster images the editors actually embed. The stored extension comes
+// from the MIME type, never from the client's filename, so nothing but an
+// image can land under images/ (SVG is left out: it can carry script).
+const IMAGE_EXTENSIONS = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/bmp': '.bmp',
+};
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const upload = (0, multer_1.default)({
+    storage,
+    limits: { fileSize: MAX_IMAGE_BYTES, files: 1 },
+    fileFilter: (_req, file, cb) => cb(null, file.mimetype in IMAGE_EXTENSIONS),
+});
+// Upload requires a signed-in intranet user (cookie session). It used to be
+// open, so anyone on the internet could write files into the bucket.
+documentsRouter.post('/upload-image', auth_middleware_1.authenticateJWT, (req, res, next) => {
+    upload.single('upload')(req, res, (err) => {
+        if (err instanceof multer_1.default.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+            res.status(413).json({ error: 'Image is larger than 10 MB.' });
+            return;
+        }
+        if (err) {
+            next(err);
+            return;
+        }
+        next();
+    });
+}, async (req, res, next) => {
     try {
+        if (!req.file) {
+            res.status(400).json({ error: 'Only PNG, JPEG, GIF, WebP or BMP images can be uploaded.' });
+            return;
+        }
+        const ext = IMAGE_EXTENSIONS[req.file.mimetype];
+        req.file.originalname = `image${ext}`;
         await documentController.createImageDocument(req, res);
     }
     catch (error) {

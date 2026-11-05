@@ -27,6 +27,15 @@ topicsRouter.get('/client/:clientId', async (req, res, next) => {
         next(error);
     }
 });
+// One person's restricted folders across their clients (Edit Profile)
+topicsRouter.get('/access/users/:userId', canManageTopics, async (req, res, next) => {
+    try {
+        await topicController.getUserFolderAccess(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 topicsRouter.get('/:topicId', async (req, res, next) => {
     try {
         await topicController.getTopicById(req, res);
@@ -70,6 +79,14 @@ topicsRouter.get('/:topicId/access', canManageTopics, async (req, res, next) => 
 topicsRouter.put('/:topicId/access', canManageTopics, async (req, res, next) => {
     try {
         await topicController.setTopicAccess(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+topicsRouter.put('/:topicId/access/users/:userId', canManageTopics, async (req, res, next) => {
+    try {
+        await topicController.setUserFolderAccess(req, res);
     }
     catch (error) {
         next(error);

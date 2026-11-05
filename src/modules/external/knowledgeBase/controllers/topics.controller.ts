@@ -138,4 +138,34 @@ export class TopicController {
       sendError(res, error);
     }
   }
+
+  async getUserFolderAccess(req: Request, res: Response) {
+    const { userId: targetUserId } = req.params;
+    const userId = req.user?.id;
+    if (!targetUserId || !userId) {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      res.json(await this.topicService.getUserFolderAccess(targetUserId, userId));
+    } catch (error) {
+      sendError(res, error);
+    }
+  }
+
+  async setUserFolderAccess(req: Request, res: Response) {
+    const { topicId, userId: targetUserId } = req.params;
+    const userId = req.user?.id;
+    const { allowed } = req.body ?? {};
+    if (!topicId || !targetUserId || !userId || typeof allowed !== 'boolean') {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      await this.topicService.setUserFolderAccess(topicId, targetUserId, allowed, userId);
+      res.sendStatus(204);
+    } catch (error) {
+      sendError(res, error);
+    }
+  }
 }

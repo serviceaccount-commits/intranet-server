@@ -251,6 +251,85 @@ let TopicService = class TopicService {
         }
         await this.topicRepository.replaceAccess(topicId, unique);
     }
+    // ─── The same allow-lists, seen from one person (Edit Profile) ────────────────
+    /** For each client assigned to `targetUserId`, the restricted folders and
+     *  whether that person is on each list. Only folders the acting user can see
+     *  are listed, so a manager never learns about folders hidden from them. */
+    async getUserFolderAccess(targetUserId, userId) {
+        const actorClients = await this.kbAccess.accessibleClientIds(userId);
+        const clients = (await this.clientRepository.findAllWithUserId(targetUserId)).filter((c) => actorClients === null || actorClients.has(c.client_id));
+        if (clients.length === 0)
+            return [];
+        const topics = await this.topicRepository.findAllByClientIds(clients.map((c) => c.client_id));
+        const visible = await this.kbAccess.filterVisibleTopics(userId, topics);
+        const access = await this.topicRepository.findAccessByTopicIds(visible.map((t) => t.topic_id));
+        const byId = new Map(topics.map((t) => [t.topic_id, t]));
+        const pathOf = (topic) => {
+            const names = [];
+            const seen = new Set();
+            let cur = topic;
+            while (cur && !seen.has(cur.topic_id)) {
+                seen.add(cur.topic_id);
+                names.unshift(cur.topic_name.trim());
+                cur = cur.parent_topic_id ? byId.get(cur.parent_topic_id) : undefined;
+            }
+            return names.join(' / ');
+        };
+        return clients
+            .map((c) => {
+            const own = visible.filter((t) => t.client_id === c.client_id);
+            const restricted = own.filter((t) => access.has(t.topic_id));
+            return {
+                client_id: c.client_id,
+                client_name: c.client_name.trim(),
+                open_folders: own.length - restricted.length,
+                folders: restricted
+                    .map((t) => {
+                    const list = access.get(t.topic_id);
+                    return {
+                        topic_id: t.topic_id,
+                        path: pathOf(t),
+                        allowed: list.has(targetUserId),
+                        allowed_count: list.size,
+                    };
+                })
+                    .sort((a, b) => a.path.localeCompare(b.path)),
+            };
+        })
+            .sort((a, b) => a.client_name.localeCompare(b.client_name));
+    }
+    /** Adds or removes one person from a restricted folder's allow-list. Open
+     *  folders are not touched here: restricting one is a folder-level decision
+     *  (who else keeps it), made from the folder's own access dialog. */
+    async setUserFolderAccess(topicId, targetUserId, allowed, userId) {
+        const topic = await this.kbAccess.assertTopicAccess(userId, topicId);
+        const access = await this.topicRepository.findAccessByTopicIds([topicId]);
+        const current = access.get(topicId);
+        if (!current || current.size === 0) {
+            throw new ValidationError_1.ValidationError('This folder is visible to everyone on the client. Restrict it from the folder first.');
+        }
+        const next = new Set(current);
+        if (allowed) {
+            const staff = await this.topicRepository.findClientStaff(topic.client_id);
+            if (!staff.some((u) => u.user_id === targetUserId)) {
+                throw new ValidationError_1.ValidationError('Give this person access to the client before adding folders.');
+            }
+            next.add(targetUserId);
+        }
+        else {
+            next.delete(targetUserId);
+            // An empty list would lift the restriction and show the folder to everyone
+            if (next.size === 0) {
+                throw new ValidationError_1.ValidationError('This person is the only one on the folder. Add someone else before removing them.');
+            }
+            if (targetUserId === userId && !(await this.kbAccess.hasFullAccess(userId))) {
+                throw new ValidationError_1.ValidationError('You would lose access to this folder.');
+            }
+        }
+        if (next.size === current.size)
+            return;
+        await this.topicRepository.replaceAccess(topicId, [...next]);
+    }
 };
 exports.TopicService = TopicService;
 exports.TopicService = TopicService = __decorate([

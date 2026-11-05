@@ -132,6 +132,36 @@ let TopicController = class TopicController {
             sendError(res, error);
         }
     }
+    async getUserFolderAccess(req, res) {
+        const { userId: targetUserId } = req.params;
+        const userId = req.user?.id;
+        if (!targetUserId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            res.json(await this.topicService.getUserFolderAccess(targetUserId, userId));
+        }
+        catch (error) {
+            sendError(res, error);
+        }
+    }
+    async setUserFolderAccess(req, res) {
+        const { topicId, userId: targetUserId } = req.params;
+        const userId = req.user?.id;
+        const { allowed } = req.body ?? {};
+        if (!topicId || !targetUserId || !userId || typeof allowed !== 'boolean') {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            await this.topicService.setUserFolderAccess(topicId, targetUserId, allowed, userId);
+            res.sendStatus(204);
+        }
+        catch (error) {
+            sendError(res, error);
+        }
+    }
 };
 exports.TopicController = TopicController;
 exports.TopicController = TopicController = __decorate([

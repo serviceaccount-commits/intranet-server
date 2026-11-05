@@ -1,4 +1,4 @@
-import { KbTopic, KbTopicAccessUser } from '../../database/kb-domain.types';
+import { KbTopic, KbTopicAccessUser, KbUserFolderAccessClient } from '../../database/kb-domain.types';
 import { CreateTopicInput } from '../../schema/topics/CreateTopicSchema';
 import { UpdateTopicInput } from '../../schema/topics/UpdateTopicSchema';
 import {
@@ -28,4 +28,11 @@ export interface ITopicService {
     userId: string,
   ): Promise<{ restricted: boolean; allowed: KbTopicAccessUser[]; staff: KbTopicAccessUser[] }>;
   setTopicAccess(topicId: string, userIds: string[], userId: string): Promise<void>;
+  getUserFolderAccess(targetUserId: string, userId: string): Promise<KbUserFolderAccessClient[]>;
+  setUserFolderAccess(
+    topicId: string,
+    targetUserId: string,
+    allowed: boolean,
+    userId: string,
+  ): Promise<void>;
 }

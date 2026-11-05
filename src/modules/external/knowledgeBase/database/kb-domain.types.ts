@@ -301,6 +301,23 @@ export interface KbTopic {
 }
 
 /** Staff member as listed in a folder's access dialog. */
+/** One client's restricted folders as seen from a single staff member's
+ *  profile (Edit Profile -> Client folders). */
+export interface KbUserFolderAccessClient {
+  client_id: string;
+  client_name: string;
+  /** Folders of the client without an allow-list (everyone on the client sees them). */
+  open_folders: number;
+  folders: {
+    topic_id: string;
+    /** "Parent / Child" path inside the client. */
+    path: string;
+    allowed: boolean;
+    /** How many people are on the folder's list in total. */
+    allowed_count: number;
+  }[];
+}
+
 export interface KbTopicAccessUser {
   user_id: string;
   first_name: string;
