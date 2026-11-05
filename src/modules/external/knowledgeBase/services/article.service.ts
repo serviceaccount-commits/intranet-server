@@ -42,6 +42,7 @@ import { ARTICLE_LOCK_DURATION_MS } from '../kb.constants';
 import { ArticleChunkingService } from './articleChunking.service';
 import { ArticleSearchService } from './articleSearch.service';
 import { KbAccessService } from './kbAccess.service';
+import { KbArchiveFolderService, withoutArchiveFolders } from './kbArchiveFolder.service';
 
 const KB_PERM_VIEW_METADATA = 'kb:article:view:metadata';
 
@@ -64,6 +65,8 @@ export class ArticleService implements IArticleService {
     private searchService: ArticleSearchService,
     @inject(TYPES.IKbAccessService)
     private kbAccess: KbAccessService,
+    @inject(TYPES.IKbArchiveFolderService)
+    private archiveFolders: KbArchiveFolderService,
   ) {}
 
   /** Asserts the user may read the client that owns this article version. */
@@ -594,13 +597,15 @@ export class ArticleService implements IArticleService {
   /** Archives the WHOLE article owning each given version (any status): every
    *  version → 'archived', hidden from the portal, and all chunks wiped so no
    *  search path (internal or client) can surface the content. Reversible via
-   *  restoreArticles. */
+   *  restoreArticles. The article also moves to its client's archive folder
+   *  (see KbArchiveFolderService) and goes back to its folder on restore. */
   async archiveArticles(versionIds: string[]): Promise<void> {
     const versions = await this.articleRepository.findByVersionIds(versionIds);
     if (versions.length === 0) throw new BusinessLogicError('No versions found.');
 
     const articleIds = [...new Set(versions.map((v) => v.article_id))];
     await this.articleRepository.archiveArticlesByIds(articleIds);
+    await this.archiveFolders.moveToArchive(articleIds);
     for (const articleId of articleIds) {
       await this.chunkingService.clearArticle(articleId);
     }
@@ -647,7 +652,8 @@ export class ArticleService implements IArticleService {
       }
       const latest = all.reduce((max, v) => (v.version > max.version ? v : max));
       await this.articleRepository.restoreArticleById(articleId, latest.article_version_id);
-      await this.restoreDeletedFolderChain(latest.topic_id);
+      const folderId = await this.archiveFolders.moveBackFromArchive(articleId);
+      await this.restoreDeletedFolderChain(folderId ?? latest.topic_id);
       // S3-stored content re-chunks on the next save; inline content re-indexes
       // right away.
       await this.chunkingService.processVersionSafe(
@@ -667,11 +673,14 @@ export class ArticleService implements IArticleService {
   private async resolveTopicIdsForSharedClient(
     clientSharedId: string,
     topicId?: string,
+    includeArchive = false,
   ): Promise<string[]> {
     const client = await this.clientRepository.findBySharedId(clientSharedId);
     if (!client) return [];
 
-    const topics = await this.topicRepository.findAllByClientId(client.client_id);
+    const all = await this.topicRepository.findAllByClientId(client.client_id);
+    // Archive folders are intranet-only (see withoutArchiveFolders)
+    const topics = includeArchive ? all : withoutArchiveFolders(all);
     if (!topicId) {
       return topics.map((t) => t.topic_id);
     }
@@ -683,7 +692,7 @@ export class ArticleService implements IArticleService {
   async getTopicsBySharedClientId(clientSharedId: string): Promise<KbTopic[]> {
     const client = await this.clientRepository.findBySharedId(clientSharedId);
     if (!client) throw new NotFoundError('Client', clientSharedId);
-    return this.topicRepository.findAllByClientId(client.client_id);
+    return withoutArchiveFolders(await this.topicRepository.findAllByClientId(client.client_id));
   }
 
   // ─── Managed writes (portal write API, X-API-Key INTERNAL_WRITE_API_KEY) ──────
@@ -817,6 +826,7 @@ export class ArticleService implements IArticleService {
     // so BPO admins (whose portal list ignores that flag) kept seeing the
     // "deleted" article. Reversible from the intranet via restoreArticles.
     await this.articleRepository.archiveArticlesByIds([current.article_id]);
+    await this.archiveFolders.moveToArchive([current.article_id]);
     await this.chunkingService.clearArticle(current.article_id);
     return { article_status: 'archived' };
   }
@@ -998,7 +1008,7 @@ export class ArticleService implements IArticleService {
   ): Promise<{ processed: number; failed: number; skipped: number }> {
     let topicIds: string[] | undefined;
     if (clientSharedId) {
-      topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+      topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, undefined, true);
       if (topicIds.length === 0) {
         return { processed: 0, failed: 0, skipped: 0 };
       }

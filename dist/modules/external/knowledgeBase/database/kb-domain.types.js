@@ -125,6 +125,9 @@ exports.KbArticleSchema = zod_1.z.object({
     // The single client-facing copy (seeded on create, edited independently).
     // Nullable/optional for documents created before dual-view (backfilled).
     client_copy: exports.KbClientCopySchema.nullable().optional(),
+    // While archived: the folder it lived in before moving to the client's
+    // archive folder. Restore moves it back and clears this.
+    archived_from_topic_id: zod_1.z.string().uuid().optional(),
     createdAt: zod_1.z.date(),
     updatedAt: zod_1.z.date(),
 });

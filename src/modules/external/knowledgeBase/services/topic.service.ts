@@ -20,6 +20,7 @@ import {
 } from '../schema/manage/ManagedTopicSchemas';
 import { KbAccessService } from './kbAccess.service';
 import { ArticleChunkingService } from './articleChunking.service';
+import { KbArchiveFolderService } from './kbArchiveFolder.service';
 
 @injectable()
 export class TopicService implements ITopicService {
@@ -36,6 +37,8 @@ export class TopicService implements ITopicService {
     private kbAccess: KbAccessService,
     @inject(TYPES.IArticleChunkingService)
     private chunkingService: ArticleChunkingService,
+    @inject(TYPES.IKbArchiveFolderService)
+    private archiveFolders: KbArchiveFolderService,
   ) {}
 
   async createTopic(input: CreateTopicInput): Promise<KbTopic> {
@@ -271,6 +274,8 @@ export class TopicService implements ITopicService {
 
     if (articleIds.length > 0) {
       await this.articleRepository.archiveArticlesByIds(articleIds);
+      // Into the client's archive folder; restoring one brings its folder back
+      await this.archiveFolders.moveToArchive(articleIds);
       for (const articleId of articleIds) {
         await this.chunkingService.clearArticle(articleId);
       }

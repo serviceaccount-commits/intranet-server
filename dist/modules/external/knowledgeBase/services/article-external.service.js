@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArticleExternalService = void 0;
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
+const kbArchiveFolder_service_1 = require("./kbArchiveFolder.service");
 const NotFoundError_1 = require("../../../../shared/errors/NotFoundError");
 let ArticleExternalService = class ArticleExternalService {
     articleRepository;
@@ -29,7 +30,7 @@ let ArticleExternalService = class ArticleExternalService {
         const client = await this.clientRepository.findBySharedId(clientSharedId);
         if (!client)
             return [];
-        const topics = await this.topicRepository.findAllByClientId(client.client_id);
+        const topics = (0, kbArchiveFolder_service_1.withoutArchiveFolders)(await this.topicRepository.findAllByClientId(client.client_id));
         return topics.map((t) => t.topic_id);
     }
     async findSharedArticlesByClientSharedId(filters, clientSharedId) {

@@ -9,6 +9,7 @@ import {
   ExternalClientArticleDetail,
 } from '../interfaces/articles/article.service.interface';
 import { FilterArticleInput } from '../schema/articles/FilterArticleSchema';
+import { withoutArchiveFolders } from './kbArchiveFolder.service';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
 
 @injectable()
@@ -26,7 +27,7 @@ export class ArticleExternalService implements IArticleExternalService {
     const client = await this.clientRepository.findBySharedId(clientSharedId);
     if (!client) return [];
 
-    const topics = await this.topicRepository.findAllByClientId(client.client_id);
+    const topics = withoutArchiveFolders(await this.topicRepository.findAllByClientId(client.client_id));
     return topics.map((t) => t.topic_id);
   }
 

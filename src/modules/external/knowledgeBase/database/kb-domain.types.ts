@@ -149,6 +149,9 @@ export const KbArticleSchema = z.object({
   // The single client-facing copy (seeded on create, edited independently).
   // Nullable/optional for documents created before dual-view (backfilled).
   client_copy: KbClientCopySchema.nullable().optional(),
+  // While archived: the folder it lived in before moving to the client's
+  // archive folder. Restore moves it back and clears this.
+  archived_from_topic_id: z.string().uuid().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

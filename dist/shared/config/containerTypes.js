@@ -24,6 +24,7 @@ const TYPES = {
     IArticleChunkingService: Symbol.for('IArticleChunkingService'),
     IArticleSearchService: Symbol.for('IArticleSearchService'),
     IKbAccessService: Symbol.for('IKbAccessService'),
+    IKbArchiveFolderService: Symbol.for('IKbArchiveFolderService'),
     ITagRepository: Symbol.for('ITagRepository'),
     ITagService: Symbol.for('ITagService'),
     IAnnouncementRepository: Symbol.for('IAnnouncementRepository'),

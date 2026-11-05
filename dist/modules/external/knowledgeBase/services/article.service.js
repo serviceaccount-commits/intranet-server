@@ -62,6 +62,7 @@ const kb_constants_1 = require("../kb.constants");
 const articleChunking_service_1 = require("./articleChunking.service");
 const articleSearch_service_1 = require("./articleSearch.service");
 const kbAccess_service_1 = require("./kbAccess.service");
+const kbArchiveFolder_service_1 = require("./kbArchiveFolder.service");
 const KB_PERM_VIEW_METADATA = 'kb:article:view:metadata';
 let ArticleService = class ArticleService {
     static { ArticleService_1 = this; }
@@ -73,7 +74,8 @@ let ArticleService = class ArticleService {
     chunkingService;
     searchService;
     kbAccess;
-    constructor(articleRepository, topicRepository, clientRepository, userRepository, tagRepository, chunkingService, searchService, kbAccess) {
+    archiveFolders;
+    constructor(articleRepository, topicRepository, clientRepository, userRepository, tagRepository, chunkingService, searchService, kbAccess, archiveFolders) {
         this.articleRepository = articleRepository;
         this.topicRepository = topicRepository;
         this.clientRepository = clientRepository;
@@ -82,6 +84,7 @@ let ArticleService = class ArticleService {
         this.chunkingService = chunkingService;
         this.searchService = searchService;
         this.kbAccess = kbAccess;
+        this.archiveFolders = archiveFolders;
     }
     /** Asserts the user may read the client that owns this article version. */
     async assertVersionAccess(userId, versionId) {
@@ -455,13 +458,15 @@ let ArticleService = class ArticleService {
     /** Archives the WHOLE article owning each given version (any status): every
      *  version → 'archived', hidden from the portal, and all chunks wiped so no
      *  search path (internal or client) can surface the content. Reversible via
-     *  restoreArticles. */
+     *  restoreArticles. The article also moves to its client's archive folder
+     *  (see KbArchiveFolderService) and goes back to its folder on restore. */
     async archiveArticles(versionIds) {
         const versions = await this.articleRepository.findByVersionIds(versionIds);
         if (versions.length === 0)
             throw new BusinessLogicError_1.BusinessLogicError('No versions found.');
         const articleIds = [...new Set(versions.map((v) => v.article_id))];
         await this.articleRepository.archiveArticlesByIds(articleIds);
+        await this.archiveFolders.moveToArchive(articleIds);
         for (const articleId of articleIds) {
             await this.chunkingService.clearArticle(articleId);
         }
@@ -504,7 +509,8 @@ let ArticleService = class ArticleService {
             }
             const latest = all.reduce((max, v) => (v.version > max.version ? v : max));
             await this.articleRepository.restoreArticleById(articleId, latest.article_version_id);
-            await this.restoreDeletedFolderChain(latest.topic_id);
+            const folderId = await this.archiveFolders.moveBackFromArchive(articleId);
+            await this.restoreDeletedFolderChain(folderId ?? latest.topic_id);
             // S3-stored content re-chunks on the next save; inline content re-indexes
             // right away.
             await this.chunkingService.processVersionSafe(articleId, latest.article_version_id, latest.content ?? '', 'internal');
@@ -514,11 +520,13 @@ let ArticleService = class ArticleService {
     /** Resolves clientSharedId → client → topics, then delegates to the repo.
      *  Optional `topicId` narrows the result to that single topic (validated to
      *  belong to the client). */
-    async resolveTopicIdsForSharedClient(clientSharedId, topicId) {
+    async resolveTopicIdsForSharedClient(clientSharedId, topicId, includeArchive = false) {
         const client = await this.clientRepository.findBySharedId(clientSharedId);
         if (!client)
             return [];
-        const topics = await this.topicRepository.findAllByClientId(client.client_id);
+        const all = await this.topicRepository.findAllByClientId(client.client_id);
+        // Archive folders are intranet-only (see withoutArchiveFolders)
+        const topics = includeArchive ? all : (0, kbArchiveFolder_service_1.withoutArchiveFolders)(all);
         if (!topicId) {
             return topics.map((t) => t.topic_id);
         }
@@ -530,7 +538,7 @@ let ArticleService = class ArticleService {
         const client = await this.clientRepository.findBySharedId(clientSharedId);
         if (!client)
             throw new NotFoundError_1.NotFoundError('Client', clientSharedId);
-        return this.topicRepository.findAllByClientId(client.client_id);
+        return (0, kbArchiveFolder_service_1.withoutArchiveFolders)(await this.topicRepository.findAllByClientId(client.client_id));
     }
     // ─── Managed writes (portal write API, X-API-Key INTERNAL_WRITE_API_KEY) ──────
     /** Actor recorded on portal-originated writes. Not a real intranet user —
@@ -601,6 +609,7 @@ let ArticleService = class ArticleService {
         // so BPO admins (whose portal list ignores that flag) kept seeing the
         // "deleted" article. Reversible from the intranet via restoreArticles.
         await this.articleRepository.archiveArticlesByIds([current.article_id]);
+        await this.archiveFolders.moveToArchive([current.article_id]);
         await this.chunkingService.clearArticle(current.article_id);
         return { article_status: 'archived' };
     }
@@ -749,7 +758,7 @@ let ArticleService = class ArticleService {
     async reindexAllPublishedChunks(clientSharedId) {
         let topicIds;
         if (clientSharedId) {
-            topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId);
+            topicIds = await this.resolveTopicIdsForSharedClient(clientSharedId, undefined, true);
             if (topicIds.length === 0) {
                 return { processed: 0, failed: 0, skipped: 0 };
             }
@@ -803,8 +812,10 @@ exports.ArticleService = ArticleService = ArticleService_1 = __decorate([
     __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleChunkingService)),
     __param(6, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleSearchService)),
     __param(7, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbAccessService)),
+    __param(8, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbArchiveFolderService)),
     __metadata("design:paramtypes", [Object, Object, Object, Object, Object, articleChunking_service_1.ArticleChunkingService,
         articleSearch_service_1.ArticleSearchService,
-        kbAccess_service_1.KbAccessService])
+        kbAccess_service_1.KbAccessService,
+        kbArchiveFolder_service_1.KbArchiveFolderService])
 ], ArticleService);
 //# sourceMappingURL=article.service.js.map

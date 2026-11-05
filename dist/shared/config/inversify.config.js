@@ -38,6 +38,7 @@ const articleChunk_repository_1 = require("../../modules/external/knowledgeBase/
 const articleChunking_service_1 = require("../../modules/external/knowledgeBase/services/articleChunking.service");
 const articleSearch_service_1 = require("../../modules/external/knowledgeBase/services/articleSearch.service");
 const kbAccess_service_1 = require("../../modules/external/knowledgeBase/services/kbAccess.service");
+const kbArchiveFolder_service_1 = require("../../modules/external/knowledgeBase/services/kbArchiveFolder.service");
 const tag_repository_1 = require("../../modules/external/knowledgeBase/repositories/tag.repository");
 const tag_service_1 = require("../../modules/external/knowledgeBase/services/tag.service");
 const tags_controller_1 = require("../../modules/external/knowledgeBase/controllers/tags.controller");
@@ -150,6 +151,9 @@ container
     .to(articleSearch_service_1.ArticleSearchService)
     .inSingletonScope();
 container.bind(containerTypes_1.TYPES.IKbAccessService).to(kbAccess_service_1.KbAccessService);
+container
+    .bind(containerTypes_1.TYPES.IKbArchiveFolderService)
+    .to(kbArchiveFolder_service_1.KbArchiveFolderService);
 container.bind(containerTypes_1.TYPES.ITagRepository).to(tag_repository_1.TagRepository);
 container.bind(containerTypes_1.TYPES.ITagService).to(tag_service_1.TagService);
 container.bind(tags_controller_1.TagController).toSelf();

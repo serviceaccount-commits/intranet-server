@@ -24,6 +24,7 @@ const UpdateTopicSchema_1 = require("../schema/topics/UpdateTopicSchema");
 const ManagedTopicSchemas_1 = require("../schema/manage/ManagedTopicSchemas");
 const kbAccess_service_1 = require("./kbAccess.service");
 const articleChunking_service_1 = require("./articleChunking.service");
+const kbArchiveFolder_service_1 = require("./kbArchiveFolder.service");
 let TopicService = class TopicService {
     topicRepository;
     articleRepository;
@@ -31,13 +32,15 @@ let TopicService = class TopicService {
     userRepository;
     kbAccess;
     chunkingService;
-    constructor(topicRepository, articleRepository, clientRepository, userRepository, kbAccess, chunkingService) {
+    archiveFolders;
+    constructor(topicRepository, articleRepository, clientRepository, userRepository, kbAccess, chunkingService, archiveFolders) {
         this.topicRepository = topicRepository;
         this.articleRepository = articleRepository;
         this.clientRepository = clientRepository;
         this.userRepository = userRepository;
         this.kbAccess = kbAccess;
         this.chunkingService = chunkingService;
+        this.archiveFolders = archiveFolders;
     }
     async createTopic(input) {
         const data = CreateTopicSchema_1.CreateTopicSchema.parse(input);
@@ -216,6 +219,8 @@ let TopicService = class TopicService {
         const { topicIds, subfolderIds, articleIds } = await this.collectFolderContents(topicId);
         if (articleIds.length > 0) {
             await this.articleRepository.archiveArticlesByIds(articleIds);
+            // Into the client's archive folder; restoring one brings its folder back
+            await this.archiveFolders.moveToArchive(articleIds);
             for (const articleId of articleIds) {
                 await this.chunkingService.clearArticle(articleId);
             }
@@ -340,7 +345,9 @@ exports.TopicService = TopicService = __decorate([
     __param(3, (0, inversify_1.inject)(containerTypes_1.TYPES.IUserRepository)),
     __param(4, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbAccessService)),
     __param(5, (0, inversify_1.inject)(containerTypes_1.TYPES.IArticleChunkingService)),
+    __param(6, (0, inversify_1.inject)(containerTypes_1.TYPES.IKbArchiveFolderService)),
     __metadata("design:paramtypes", [Object, Object, Object, Object, kbAccess_service_1.KbAccessService,
-        articleChunking_service_1.ArticleChunkingService])
+        articleChunking_service_1.ArticleChunkingService,
+        kbArchiveFolder_service_1.KbArchiveFolderService])
 ], TopicService);
 //# sourceMappingURL=topic.service.js.map
