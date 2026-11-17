@@ -22,9 +22,11 @@ const data_source_1 = require("../../../../shared/database/data-source");
 const mongo_connection_1 = require("../../../../shared/database/mongo-connection");
 const logger_1 = require("../../../../shared/utils/logger");
 const kb_collections_1 = require("../database/kb-collections");
-/** Root folders named like "IMT - Archived" or "Tempo Archive" are a client's archive. */
+/** Folders named like "IMT - Archived" or "Tempo Archive" are archives, at
+ *  any depth (an archive moved under another folder stays one). The client's
+ *  OWN archive, where archiving puts articles, is the root one. */
 const ARCHIVE_FOLDER_NAME = /(^|[\s-])archived?\s*$/i;
-/** Whether a ROOT folder with this name is its client's archive. */
+/** Whether a folder with this name is an archive. */
 function isArchiveFolderName(name) {
     return ARCHIVE_FOLDER_NAME.test(name.trim());
 }
@@ -42,11 +44,7 @@ function withoutArchiveFolders(topics) {
             return false;
         seen.add(t.topic_id);
         const parent = t.parent_topic_id ? byId.get(t.parent_topic_id) : undefined;
-        const result = t.parent_topic_id
-            ? parent
-                ? inArchive(parent, seen)
-                : false
-            : ARCHIVE_FOLDER_NAME.test(t.topic_name.trim());
+        const result = isArchiveFolderName(t.topic_name) || (parent ? inArchive(parent, seen) : false);
         memo.set(t.topic_id, result);
         return result;
     };
@@ -120,14 +118,17 @@ let KbArchiveFolderService = class KbArchiveFolderService {
         await this.articles.updateOne({ _id }, { $set: { topic_id: from }, $unset: { archived_from_topic_id: '' } });
         return from;
     }
+    /** The folder, or any folder above it, is an archive. */
     isInsideArchive(topicId, all) {
         const byId = new Map(all.map((t) => [t.topic_id, t]));
         const seen = new Set();
         let cur = byId.get(topicId);
         while (cur && !seen.has(cur.topic_id)) {
             seen.add(cur.topic_id);
+            if (isArchiveFolderName(cur.topic_name))
+                return true;
             if (!cur.parent_topic_id)
-                return ARCHIVE_FOLDER_NAME.test(cur.topic_name.trim());
+                return false;
             cur = byId.get(cur.parent_topic_id);
         }
         return false;

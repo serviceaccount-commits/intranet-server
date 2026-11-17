@@ -20,7 +20,7 @@ import {
 } from '../schema/manage/ManagedTopicSchemas';
 import { KbAccessService } from './kbAccess.service';
 import { ArticleChunkingService } from './articleChunking.service';
-import { KbArchiveFolderService, isArchiveFolderName } from './kbArchiveFolder.service';
+import { KbArchiveFolderService } from './kbArchiveFolder.service';
 
 @injectable()
 export class TopicService implements ITopicService {
@@ -92,10 +92,8 @@ export class TopicService implements ITopicService {
     if (changesClient) {
       const client = await this.clientRepository.findById(destinationClientId);
       if (!client) throw new NotFoundError('Client', destinationClientId);
-      // Each client keeps its own archive folder; it never changes hands.
-      if (!topic.parent_topic_id && isArchiveFolderName(topic.topic_name)) {
-        throw new ValidationError('An archive folder stays with its client.');
-      }
+      // An archive folder may go too: it stays an archive wherever it sits
+      // (hidden from the portal) and the client gets a fresh one on demand.
       // Staff may only carry content between clients they can already read
       // (KB managers can read every client).
       if (data.userId) {

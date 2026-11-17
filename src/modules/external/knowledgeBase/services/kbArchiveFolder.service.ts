@@ -10,10 +10,12 @@ import { KbTopic } from '../database/kb-domain.types';
 import { IClientRepository } from '../interfaces/clients/client.repository.interface';
 import { ITopicRepository } from '../interfaces/topics/topic.repository.interface';
 
-/** Root folders named like "IMT - Archived" or "Tempo Archive" are a client's archive. */
+/** Folders named like "IMT - Archived" or "Tempo Archive" are archives, at
+ *  any depth (an archive moved under another folder stays one). The client's
+ *  OWN archive, where archiving puts articles, is the root one. */
 const ARCHIVE_FOLDER_NAME = /(^|[\s-])archived?\s*$/i;
 
-/** Whether a ROOT folder with this name is its client's archive. */
+/** Whether a folder with this name is an archive. */
 export function isArchiveFolderName(name: string): boolean {
   return ARCHIVE_FOLDER_NAME.test(name.trim());
 }
@@ -32,11 +34,8 @@ export function withoutArchiveFolders<T extends Pick<KbTopic, 'topic_id' | 'topi
     if (seen.has(t.topic_id)) return false;
     seen.add(t.topic_id);
     const parent = t.parent_topic_id ? byId.get(t.parent_topic_id) : undefined;
-    const result = t.parent_topic_id
-      ? parent
-        ? inArchive(parent, seen)
-        : false
-      : ARCHIVE_FOLDER_NAME.test(t.topic_name.trim());
+    const result =
+      isArchiveFolderName(t.topic_name) || (parent ? inArchive(parent, seen) : false);
     memo.set(t.topic_id, result);
     return result;
   };
@@ -125,13 +124,15 @@ export class KbArchiveFolderService {
     return from;
   }
 
+  /** The folder, or any folder above it, is an archive. */
   private isInsideArchive(topicId: string, all: KbTopic[]): boolean {
     const byId = new Map(all.map((t) => [t.topic_id, t]));
     const seen = new Set<string>();
     let cur = byId.get(topicId);
     while (cur && !seen.has(cur.topic_id)) {
       seen.add(cur.topic_id);
-      if (!cur.parent_topic_id) return ARCHIVE_FOLDER_NAME.test(cur.topic_name.trim());
+      if (isArchiveFolderName(cur.topic_name)) return true;
+      if (!cur.parent_topic_id) return false;
       cur = byId.get(cur.parent_topic_id);
     }
     return false;

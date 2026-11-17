@@ -86,10 +86,8 @@ let TopicService = class TopicService {
             const client = await this.clientRepository.findById(destinationClientId);
             if (!client)
                 throw new NotFoundError_1.NotFoundError('Client', destinationClientId);
-            // Each client keeps its own archive folder; it never changes hands.
-            if (!topic.parent_topic_id && (0, kbArchiveFolder_service_1.isArchiveFolderName)(topic.topic_name)) {
-                throw new ValidationError_1.ValidationError('An archive folder stays with its client.');
-            }
+            // An archive folder may go too: it stays an archive wherever it sits
+            // (hidden from the portal) and the client gets a fresh one on demand.
             // Staff may only carry content between clients they can already read
             // (KB managers can read every client).
             if (data.userId) {
