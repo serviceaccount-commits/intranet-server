@@ -42,8 +42,10 @@ export class TopicController {
     }
 
     const input: UpdateTopicInput = {
-      ...(req.body as Omit<UpdateTopicInput, 'topicId'>),
+      ...(req.body as Omit<UpdateTopicInput, 'topicId' | 'userId'>),
       topicId,
+      // Always the session's user: a cross-client move checks their access
+      userId: req.user?.id,
     };
 
     const topic = await this.topicService.updateTopic(input);

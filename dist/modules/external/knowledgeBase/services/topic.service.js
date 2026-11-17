@@ -78,9 +78,29 @@ let TopicService = class TopicService {
         if (data.topicName !== undefined) {
             topic.topic_name = data.topicName;
         }
+        // A different `targetClientId` moves the folder to that client; the parent
+        // is then read against it. Same client = a plain move within the client.
+        const changesClient = data.targetClientId !== undefined && data.targetClientId !== topic.client_id;
+        const destinationClientId = changesClient ? data.targetClientId : topic.client_id;
+        if (changesClient) {
+            const client = await this.clientRepository.findById(destinationClientId);
+            if (!client)
+                throw new NotFoundError_1.NotFoundError('Client', destinationClientId);
+            // Each client keeps its own archive folder; it never changes hands.
+            if (!topic.parent_topic_id && (0, kbArchiveFolder_service_1.isArchiveFolderName)(topic.topic_name)) {
+                throw new ValidationError_1.ValidationError('An archive folder stays with its client.');
+            }
+            // Staff may only carry content between clients they can already read
+            // (KB managers can read every client).
+            if (data.userId) {
+                await this.kbAccess.assertClientAccess(data.userId, topic.client_id);
+                await this.kbAccess.assertClientAccess(data.userId, destinationClientId);
+            }
+        }
         // `parentTopicId` is only checked when the key is present in the payload.
-        // Sending `null` explicitly means "promote to root of the client".
-        if (Object.prototype.hasOwnProperty.call(data, 'parentTopicId')) {
+        // Sending `null` explicitly means "promote to root of the client". A move
+        // to another client always places the folder: absent = that client's root.
+        if (changesClient || Object.prototype.hasOwnProperty.call(data, 'parentTopicId')) {
             const newParentId = data.parentTopicId ?? null;
             if (newParentId === topic.topic_id) {
                 throw new ValidationError_1.ValidationError('A folder cannot be its own parent.');
@@ -89,8 +109,10 @@ let TopicService = class TopicService {
                 const parent = await this.topicRepository.findById(newParentId);
                 if (!parent)
                     throw new NotFoundError_1.NotFoundError('Topic', newParentId);
-                if (parent.client_id !== topic.client_id) {
-                    throw new ValidationError_1.ValidationError('Parent folder belongs to a different client.');
+                if (parent.client_id !== destinationClientId) {
+                    throw new ValidationError_1.ValidationError(changesClient
+                        ? 'The destination folder belongs to a different client.'
+                        : 'Parent folder belongs to a different client.');
                 }
                 // Reject if the candidate parent is one of this topic's descendants:
                 // that would create a cycle.
@@ -98,6 +120,13 @@ let TopicService = class TopicService {
                 if (descendantIds.includes(newParentId)) {
                     throw new ValidationError_1.ValidationError('Cannot move a folder under one of its own descendants.');
                 }
+            }
+            if (changesClient) {
+                // The whole subtree (deleted subfolders too, so a later restore does
+                // not revive a folder under the old client) changes client in one
+                // statement. Articles live in Mongo keyed by topic_id and follow.
+                await this.topicRepository.moveSubtreeToClient(topic.topic_id, destinationClientId);
+                topic.client_id = destinationClientId;
             }
             topic.parent_topic_id = newParentId;
         }

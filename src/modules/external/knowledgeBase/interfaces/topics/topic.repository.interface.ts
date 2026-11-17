@@ -11,6 +11,8 @@ export interface ITopicRepository {
   deleteById(id: string): Promise<void>;
   /** Returns descendants only (excludes the root). */
   findAllDescendantIds(rootTopicId: string): Promise<string[]>;
+  /** Changes the client of the root and its whole subtree (deleted rows too). */
+  moveSubtreeToClient(rootTopicId: string, clientId: string): Promise<void>;
   /** Soft-deleted rows included (they keep archived articles reachable). */
   findByIdWithDeleted(id: string): Promise<KbTopic | null>;
   findAllByClientIdsWithDeleted(clientIds: string[]): Promise<KbTopic[]>;

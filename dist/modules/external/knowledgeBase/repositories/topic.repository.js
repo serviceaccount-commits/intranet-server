@@ -85,6 +85,19 @@ let TopicRepository = class TopicRepository {
        SELECT topic_id FROM descendants`, [rootTopicId]);
         return rows.map((r) => r.topic_id);
     }
+    /** Hands the folder and everything under it (soft-deleted subfolders too)
+     *  to another client, in a single statement. The caller sets the new
+     *  parent; this only changes ownership. */
+    async moveSubtreeToClient(rootTopicId, clientId) {
+        await this.repo.query(`WITH RECURSIVE subtree AS (
+         SELECT topic_id FROM topics WHERE topic_id = $1
+         UNION ALL
+         SELECT t.topic_id FROM topics t
+         INNER JOIN subtree s ON t.parent_topic_id = s.topic_id
+       )
+       UPDATE topics SET client_id = $2
+       WHERE topic_id IN (SELECT topic_id FROM subtree)`, [rootTopicId, clientId]);
+    }
     // ─── Per-folder staff access ──────────────────────────────────────────────────
     /** topic_id → user_ids allowed, for every restricted topic among `topicIds`.
      *  Topics missing from the map are unrestricted. */

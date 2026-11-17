@@ -47,6 +47,8 @@ let TopicController = class TopicController {
         const input = {
             ...req.body,
             topicId,
+            // Always the session's user: a cross-client move checks their access
+            userId: req.user?.id,
         };
         const topic = await this.topicService.updateTopic(input);
         return res.json(topic);

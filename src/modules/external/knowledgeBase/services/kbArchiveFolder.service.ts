@@ -13,6 +13,11 @@ import { ITopicRepository } from '../interfaces/topics/topic.repository.interfac
 /** Root folders named like "IMT - Archived" or "Tempo Archive" are a client's archive. */
 const ARCHIVE_FOLDER_NAME = /(^|[\s-])archived?\s*$/i;
 
+/** Whether a ROOT folder with this name is its client's archive. */
+export function isArchiveFolderName(name: string): boolean {
+  return ARCHIVE_FOLDER_NAME.test(name.trim());
+}
+
 /** A client's topics minus its archive folders and everything under them.
  *  Archives are intranet-only: the portal (client and BPO admin views) never
  *  lists them, their articles, or their search hits. */
