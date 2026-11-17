@@ -140,12 +140,15 @@ export class TopicRepository implements ITopicRepository {
     });
   }
 
-  /** Active staff with access to the client (user_clients), A→Z. */
+  /** Active staff with access to the client (user_clients), A→Z. Role and
+   *  job title let the folder-access picker select whole groups at once. */
   async findClientStaff(clientId: string): Promise<KbTopicAccessUser[]> {
     return this.repo.query(
-      `SELECT u.user_id, u.first_name, u.last_name, u.work_email
+      `SELECT u.user_id, u.first_name, u.last_name, u.work_email,
+              u.job_title, r.role_name
          FROM user_clients uc
          INNER JOIN users u ON u.user_id = uc.user_id
+         LEFT JOIN roles r ON r.role_id = u.role_id
         WHERE uc.client_id = $1 AND u.status = 'active'
         ORDER BY u.first_name, u.last_name`,
       [clientId],
@@ -155,9 +158,12 @@ export class TopicRepository implements ITopicRepository {
   async findUsersByIds(userIds: string[]): Promise<KbTopicAccessUser[]> {
     if (userIds.length === 0) return [];
     return this.repo.query(
-      `SELECT user_id, first_name, last_name, work_email
-         FROM users WHERE user_id = ANY($1::uuid[])
-        ORDER BY first_name, last_name`,
+      `SELECT u.user_id, u.first_name, u.last_name, u.work_email,
+              u.job_title, r.role_name
+         FROM users u
+         LEFT JOIN roles r ON r.role_id = u.role_id
+        WHERE u.user_id = ANY($1::uuid[])
+        ORDER BY u.first_name, u.last_name`,
       [userIds],
     );
   }

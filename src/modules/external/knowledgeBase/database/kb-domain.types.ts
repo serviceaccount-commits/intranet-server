@@ -326,4 +326,7 @@ export interface KbTopicAccessUser {
   first_name: string;
   last_name: string;
   work_email: string;
+  /** Grouping handles for the folder-access picker (select a whole team). */
+  job_title?: string | null;
+  role_name?: string | null;
 }
