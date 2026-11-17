@@ -66,6 +66,12 @@ let ClientRepository = class ClientRepository {
             .of(clientId)
             .add(userId);
     }
+    async deleteById(clientId) {
+        await data_source_1.AppDataSource.manager.transaction(async (manager) => {
+            await manager.query(`DELETE FROM user_clients WHERE client_id = $1`, [clientId]);
+            await manager.delete(Client_entity_1.Client, { client_id: clientId });
+        });
+    }
     async findAndCountAllFiltered(input) {
         const { search, entity, page, limit } = input;
         const where = {};

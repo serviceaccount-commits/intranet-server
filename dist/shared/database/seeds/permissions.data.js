@@ -5,6 +5,8 @@ exports.PERMISSIONS = [
     { permission_id: 'dummy:confidential:one', app_module: 'knowledge-base' },
     { permission_id: 'kb:access', app_module: 'knowledge-base' },
     { permission_id: 'kb:client:manage', app_module: 'knowledge-base' },
+    // See every client's folders and articles, restricted ones included
+    { permission_id: 'kb:all:access', app_module: 'knowledge-base' },
     { permission_id: 'kb:topic:manage', app_module: 'knowledge-base' },
     { permission_id: 'kb:article:manage', app_module: 'knowledge-base' },
     { permission_id: 'kb:article:view:metadata', app_module: 'knowledge-base' },

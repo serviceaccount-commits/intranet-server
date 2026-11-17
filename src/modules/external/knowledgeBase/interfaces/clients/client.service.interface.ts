@@ -10,4 +10,6 @@ export interface IClientService {
   getClients(): Promise<KbClient[]>;
   getFilteredClients(input: FilterClientInput): Promise<PaginatedKbClientResult>;
   getClientById(clientId: string): Promise<KbClient>;
+  /** Only a client without folders (deleted ones included) can be removed. */
+  deleteClient(clientId: string): Promise<void>;
 }

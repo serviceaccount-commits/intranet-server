@@ -16,4 +16,6 @@ export interface IClientRepository {
   /** Adds a row to the user_clients access table so the user sees the client in the KB tree. */
   addUserAccess(clientId: string, userId: string): Promise<void>;
   findAndCountAllFiltered(input: FilterClientInput): Promise<PaginatedKbClientResult>;
+  /** Drops the client and its user_clients rows. The caller checks it is empty. */
+  deleteById(clientId: string): Promise<void>;
 }

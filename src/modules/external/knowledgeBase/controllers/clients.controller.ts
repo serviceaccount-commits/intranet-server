@@ -76,6 +76,28 @@ export class ClientController {
     }
   }
 
+  async deleteClient(req: Request, res: Response) {
+    const { clientId } = req.params;
+    if (!clientId) {
+      res.sendStatus(400);
+      return;
+    }
+
+    try {
+      await this.clientService.deleteClient(clientId);
+      res.sendStatus(204);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        res.status(404).json({ message: error.message });
+        return;
+      }
+      // "Still has folders" and the like: the dialog shows the reason
+      res.status(400).json({
+        message: error instanceof Error ? error.message : 'Unexpected error',
+      });
+    }
+  }
+
   async getClients(_req: Request, res: Response) {
     const clients = await this.clientService.getClients();
 

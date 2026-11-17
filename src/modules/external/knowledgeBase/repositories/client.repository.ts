@@ -75,6 +75,13 @@ export class ClientRepository implements IClientRepository {
       .add(userId);
   }
 
+  async deleteById(clientId: string): Promise<void> {
+    await AppDataSource.manager.transaction(async (manager) => {
+      await manager.query(`DELETE FROM user_clients WHERE client_id = $1`, [clientId]);
+      await manager.delete(Client, { client_id: clientId });
+    });
+  }
+
   async findAndCountAllFiltered(input: FilterClientInput): Promise<PaginatedKbClientResult> {
     const { search, entity, page, limit } = input;
 

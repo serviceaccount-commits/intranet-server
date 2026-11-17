@@ -28,8 +28,10 @@ const CURRENCY_1 = __importDefault(require("../../../../shared/types/enum/CURREN
 const REGION_1 = __importDefault(require("../../../../shared/types/enum/REGION"));
 let ClientService = class ClientService {
     clientRepository;
-    constructor(clientRepository) {
+    topicRepository;
+    constructor(clientRepository, topicRepository) {
         this.clientRepository = clientRepository;
+        this.topicRepository = topicRepository;
     }
     async createClient(input, userId) {
         const data = CreateClientSchema_1.CreateClientSchema.parse(input);
@@ -132,11 +134,31 @@ let ClientService = class ClientService {
             throw new NotFoundError_1.NotFoundError('Client', clientId);
         return client;
     }
+    /**
+     * Removes a client that holds nothing: no folders at all, deleted ones
+     * included (they keep archived articles reachable). Folders go first, from
+     * the KB tree; then the client and its staff access rows are dropped. The
+     * portal keeps its own client record and has to be cleaned there.
+     */
+    async deleteClient(clientId) {
+        const client = await this.clientRepository.findById(clientId);
+        if (!client)
+            throw new NotFoundError_1.NotFoundError('Client', clientId);
+        const topics = await this.topicRepository.findAllByClientIdsWithDeleted([clientId]);
+        if (topics.length > 0) {
+            const live = topics.filter((t) => !t.deleted_at).length;
+            throw new BusinessLogicError_1.BusinessLogicError(live > 0
+                ? `"${client.client_name}" still has ${live} folder(s). Delete them from the Knowledge Base first.`
+                : `"${client.client_name}" still has deleted folders with archived articles. Restore and delete them first.`);
+        }
+        await this.clientRepository.deleteById(clientId);
+    }
 };
 exports.ClientService = ClientService;
 exports.ClientService = ClientService = __decorate([
     (0, inversify_1.injectable)(),
     __param(0, (0, inversify_1.inject)(containerTypes_1.TYPES.IClientRepository)),
-    __metadata("design:paramtypes", [Object])
+    __param(1, (0, inversify_1.inject)(containerTypes_1.TYPES.ITopicRepository)),
+    __metadata("design:paramtypes", [Object, Object])
 ], ClientService);
 //# sourceMappingURL=client.service.js.map

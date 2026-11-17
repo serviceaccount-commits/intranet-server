@@ -2,6 +2,7 @@ import { inject, injectable } from 'inversify';
 import { TYPES } from '../../../../shared/config/containerTypes';
 import { IClientService } from '../interfaces/clients/client.service.interface';
 import { IClientRepository } from '../interfaces/clients/client.repository.interface';
+import { ITopicRepository } from '../interfaces/topics/topic.repository.interface';
 import { KbClient, PaginatedKbClientResult } from '../database/kb-domain.types';
 import { ConflictError } from '../../../../shared/errors/ConflictError';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
@@ -18,6 +19,8 @@ export class ClientService implements IClientService {
   constructor(
     @inject(TYPES.IClientRepository)
     private clientRepository: IClientRepository,
+    @inject(TYPES.ITopicRepository)
+    private topicRepository: ITopicRepository,
   ) {}
 
   async createClient(input: CreateClientInput, userId: string): Promise<KbClient> {
@@ -134,5 +137,28 @@ export class ClientService implements IClientService {
     const client = await this.clientRepository.findById(clientId);
     if (!client) throw new NotFoundError('Client', clientId);
     return client;
+  }
+
+  /**
+   * Removes a client that holds nothing: no folders at all, deleted ones
+   * included (they keep archived articles reachable). Folders go first, from
+   * the KB tree; then the client and its staff access rows are dropped. The
+   * portal keeps its own client record and has to be cleaned there.
+   */
+  async deleteClient(clientId: string): Promise<void> {
+    const client = await this.clientRepository.findById(clientId);
+    if (!client) throw new NotFoundError('Client', clientId);
+
+    const topics = await this.topicRepository.findAllByClientIdsWithDeleted([clientId]);
+    if (topics.length > 0) {
+      const live = topics.filter((t) => !t.deleted_at).length;
+      throw new BusinessLogicError(
+        live > 0
+          ? `"${client.client_name}" still has ${live} folder(s). Delete them from the Knowledge Base first.`
+          : `"${client.client_name}" still has deleted folders with archived articles. Restore and delete them first.`,
+      );
+    }
+
+    await this.clientRepository.deleteById(clientId);
   }
 }

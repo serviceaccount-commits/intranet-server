@@ -10,11 +10,15 @@ import { KbTopic } from '../database/kb-domain.types';
 
 /**
  * Users holding this permission (KB managers) bypass per-client scoping and
- * see every client's content — mirroring the client management screens they
- * already control. Everyone else is limited to the clients granted to them in
- * the `user_clients` access table (the same source the KB sidebar tree uses).
+ * see every client's content, restricted folders included. Everyone else is
+ * limited to the clients granted to them in the `user_clients` access table
+ * (the same source the KB sidebar tree uses).
+ *
+ * It used to be `kb:client:manage`; that one now only covers creating,
+ * editing and deleting clients, so a client administrator (Sara, 2026-11-17)
+ * can be kept to the folders she was given.
  */
-const KB_PERM_CLIENT_MANAGE = 'kb:client:manage';
+const KB_PERM_ALL_ACCESS = 'kb:all:access';
 
 /**
  * Per-user read scoping for the internal (staff, JWT) Knowledge Base routes.
@@ -49,7 +53,7 @@ export class KbAccessService {
     const user = await this.userRepository.findUserByIdWithPermissions(userId);
     return (
       user?.role?.permissions?.some(
-        (p) => p.permission_id === KB_PERM_CLIENT_MANAGE,
+        (p) => p.permission_id === KB_PERM_ALL_ACCESS,
       ) ?? false
     );
   }
