@@ -195,6 +195,7 @@ class UserRepository {
         ])
             .leftJoinAndSelect('user.userDetails', 'userDetails')
             .leftJoinAndSelect('user.role', 'role')
+            .leftJoinAndSelect('user.additionalRoles', 'additionalRoles')
             .leftJoinAndSelect('user.reportingTo', 'reportsToRel')
             .leftJoinAndSelect('reportsToRel.reportsToUser', 'reportsTo')
             .leftJoinAndSelect('user.clients', 'client')
@@ -223,6 +224,7 @@ class UserRepository {
             relations: {
                 userDetails: true,
                 role: { permissions: true },
+                additionalRoles: { permissions: true },
                 clients: true,
             },
         });
@@ -243,6 +245,7 @@ class UserRepository {
             },
             relations: {
                 role: { permissions: true },
+                additionalRoles: { permissions: true },
             },
         });
     }
@@ -302,6 +305,7 @@ class UserRepository {
             },
             relations: {
                 role: { permissions: true },
+                additionalRoles: { permissions: true },
             },
         });
     }

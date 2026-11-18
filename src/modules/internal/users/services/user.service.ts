@@ -1,3 +1,7 @@
+import { effectivePermissionIds } from '../utils/effectivePermissions';
+
+/** The permission that lets someone give or take roles from people. */
+export const ROLES_ASSIGN = 'roles:assign';
 import { inject, injectable } from 'inversify';
 import {
   IUserService,
@@ -356,6 +360,7 @@ export class UserService implements IUserService {
           : '',
         assignments: user.assignments ? user.assignments : [],
         role: user.role ? user.role : null,
+        additional_roles: user.additionalRoles ?? [],
       },
       private_profile: {
         personal_email: details?.personal_email ?? '',
@@ -592,13 +597,90 @@ export class UserService implements IUserService {
     });
   }
 
+  // ─── Roles: one main role plus any number of additional ones ────────────────
+
+  /** Permissions a set of roles would give, to stop someone from removing
+   *  their own ability to assign roles. */
+  private async permissionsOfRoles(roleIds: string[]): Promise<Set<string>> {
+    if (roleIds.length === 0) return new Set();
+    const rows: { permission_id: string }[] = await AppDataSource.query(
+      `SELECT DISTINCT permission_id FROM role_permissions WHERE role_id = ANY($1::uuid[])`,
+      [roleIds],
+    );
+    return new Set(rows.map((r) => r.permission_id));
+  }
+
+  async getUserRoleIds(userId: string): Promise<{ roleId: string | null; additionalRoleIds: string[] }> {
+    const [user] = await AppDataSource.query(`SELECT role_id FROM users WHERE user_id = $1`, [userId]);
+    if (!user) throw new NotFoundError('User', userId);
+    const extra: { role_id: string }[] = await AppDataSource.query(
+      `SELECT role_id FROM user_additional_roles WHERE user_id = $1`,
+      [userId],
+    );
+    return { roleId: user.role_id, additionalRoleIds: extra.map((r) => r.role_id) };
+  }
+
+  /** Replaces a person's main role and additional roles. */
+  async setUserRoles(
+    userId: string,
+    roleId: string,
+    additionalRoleIds: string[],
+    actorId: string,
+  ): Promise<void> {
+    await this.getUserRoleIds(userId); // 404 when the person does not exist
+    const extra = [...new Set(additionalRoleIds)].filter((id) => id !== roleId);
+    const ids = [roleId, ...extra];
+    const found: { role_id: string }[] = await AppDataSource.query(
+      `SELECT role_id FROM roles WHERE role_id = ANY($1::uuid[])`,
+      [ids],
+    );
+    if (found.length !== ids.length) throw new NotFoundError('Role(s)');
+
+    if (userId === actorId && !(await this.permissionsOfRoles(ids)).has(ROLES_ASSIGN)) {
+      throw new BusinessValidationError('You would lose the ability to assign roles.', {
+        roles: 'You would lose the ability to assign roles.',
+      });
+    }
+
+    await AppDataSource.transaction(async (manager) => {
+      await manager.query(`UPDATE users SET role_id = $2 WHERE user_id = $1`, [userId, roleId]);
+      await manager.query(`DELETE FROM user_additional_roles WHERE user_id = $1`, [userId]);
+      if (extra.length > 0) {
+        await manager.query(
+          `INSERT INTO user_additional_roles (user_id, role_id)
+           SELECT $1::uuid, x FROM unnest($2::uuid[]) AS x`,
+          [userId, extra],
+        );
+      }
+    });
+  }
+
+  /** Adds or removes one additional role (e.g. turning a module on or off). */
+  async toggleAdditionalRole(
+    userId: string,
+    roleId: string,
+    enabled: boolean,
+    actorId: string,
+  ): Promise<void> {
+    const current = await this.getUserRoleIds(userId);
+    const next = new Set(current.additionalRoleIds);
+    if (enabled) next.add(roleId);
+    else next.delete(roleId);
+    if (!current.roleId) {
+      throw new BusinessValidationError('This person has no main role yet.', {
+        roles: 'Give this person a main role first.',
+      });
+    }
+    await this.setUserRoles(userId, current.roleId, [...next], actorId);
+  }
+
   async getUserPermissions(userId: string): Promise<string[]> {
     const user = await this.userRepository.findUserWithPermissions(userId);
 
     if (!user) {
       throw new NotFoundError('User', userId);
     }
-    return user.role.permissions.map((permission) => permission.permission_id);
+    return effectivePermissionIds(user);
   }
 
   async getSheetData(

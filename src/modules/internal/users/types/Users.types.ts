@@ -9,6 +9,8 @@ export interface PublicUserProfile {
   work_email: string;
   work_phone: string;
   role: Role | null;
+  /** Roles on top of the main one (modules, Admin…) */
+  additional_roles: Role[];
   assignments: Assignment[];
   reports_to_id: string;
   reports_to_first_name: string;

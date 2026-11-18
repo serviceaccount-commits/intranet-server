@@ -34,6 +34,8 @@ export const PERMISSIONS: Partial<Permission>[] = [
 
   { permission_id: 'roles:access', app_module: 'admin' },
   { permission_id: 'roles:manage', app_module: 'admin' },
+  // Give and take roles from people (main and additional)
+  { permission_id: 'roles:assign', app_module: 'admin' },
 
   { permission_id: 'login', app_module: 'admin' },
 ];

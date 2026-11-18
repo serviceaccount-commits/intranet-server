@@ -5,10 +5,20 @@ import { TYPES } from '../../../../shared/config/containerTypes';
 import { IUserService } from '../interfaces/users/user.service.interface';
 import { CreateUserSchema } from '../schema/users/CreateUserSchema';
 import { UpdateUserInput } from '../schema/users/UpdateUserSchema';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import { FilterUserSchema } from '../schema/users/FilterUserSchema';
 import { BusinessValidationError } from '../../../../shared/errors/BusinessValidationError';
 
+
+const SetUserRolesSchema = z
+  .object({
+    roleId: z.string().uuid(),
+    additionalRoleIds: z.array(z.string().uuid()).max(50).default([]),
+  })
+  .strict();
+
+/** Only these people give or take roles, the main one included. */
+const ROLES_ASSIGN_PERMISSION = 'roles:assign';
 
 /** Directory admins edit anyone, themselves included, without limits. */
 const DIRECTORY_ADMIN_PERMISSION = 'directory:user:create';
@@ -239,6 +249,13 @@ export default class UserController {
         }
       }
 
+      if (input.roleId !== undefined && actorId) {
+        const actorPermissions = await this.userService.getUserPermissions(actorId);
+        if (!actorPermissions.includes(ROLES_ASSIGN_PERMISSION)) {
+          return res.status(403).json({ message: 'Only an admin can change roles.' });
+        }
+      }
+
       const updatedUser = await this.userService.updateUser(userId, input);
 
       res.status(200).json(updatedUser);
@@ -267,6 +284,54 @@ export default class UserController {
         return res.status(400).json({ message: error.message });
       }
     }
+  }
+
+  async getUserRoles(req: Request, res: Response) {
+    try {
+      res.json(await this.userService.getUserRoleIds(req.params['userId'] as string));
+    } catch (error) {
+      this.sendRolesError(res, error);
+    }
+  }
+
+  async setUserRoles(req: Request, res: Response) {
+    const parsed = SetUserRolesSchema.safeParse(req.body ?? {});
+    if (!parsed.success || !req.user?.id) {
+      return res.status(400).json({ message: 'Pick a main role; additional roles are optional.' });
+    }
+    try {
+      await this.userService.setUserRoles(
+        req.params['userId'] as string,
+        parsed.data.roleId,
+        parsed.data.additionalRoleIds,
+        req.user.id,
+      );
+      res.sendStatus(204);
+    } catch (error) {
+      this.sendRolesError(res, error);
+    }
+  }
+
+  async toggleAdditionalRole(req: Request, res: Response, enabled: boolean) {
+    const { userId, roleId } = req.params;
+    if (!userId || !roleId || !req.user?.id) return res.sendStatus(400);
+    try {
+      await this.userService.toggleAdditionalRole(userId, roleId, enabled, req.user.id);
+      res.sendStatus(204);
+    } catch (error) {
+      this.sendRolesError(res, error);
+    }
+  }
+
+  private sendRolesError(res: Response, error: unknown) {
+    if (error instanceof BusinessValidationError) {
+      return res.status(422).json({ message: error.message, errors: error.errors });
+    }
+    if (error instanceof Error) {
+      const status = (error as { statusCode?: number }).statusCode ?? 400;
+      return res.status(status).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Could not change the roles' });
   }
 
   async deleteUser(req: Request, res: Response) {

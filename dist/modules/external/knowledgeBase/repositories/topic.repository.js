@@ -138,7 +138,10 @@ let TopicRepository = class TopicRepository {
         return this.repo.query(`SELECT u.user_id, u.first_name, u.last_name, u.work_email,
               u.job_title, r.role_name,
               EXISTS (SELECT 1 FROM role_permissions rp
-                       WHERE rp.role_id = u.role_id AND rp.permission_id = 'kb:access') AS kb_access
+                       WHERE rp.permission_id = 'kb:access'
+                         AND (rp.role_id = u.role_id
+                              OR rp.role_id IN (SELECT ur.role_id FROM user_additional_roles ur
+                                                 WHERE ur.user_id = u.user_id))) AS kb_access
          FROM users u
          LEFT JOIN roles r ON r.role_id = u.role_id
         WHERE u.status = 'active'

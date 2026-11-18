@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.configurePassport = void 0;
+const effectivePermissions_1 = require("../../modules/internal/users/utils/effectivePermissions");
 const logger_1 = require("../utils/logger");
 const passport_1 = __importDefault(require("passport"));
 const passport_google_oauth20_1 = require("passport-google-oauth20");
@@ -39,7 +40,7 @@ const configurePassport = async () => {
             const jwtUserPayload = {
                 id: user.user_id,
                 username: user.first_name,
-                permissions: user.role.permissions.map((p) => p.permission_id),
+                permissions: (0, effectivePermissions_1.effectivePermissionIds)(user),
             };
             return done(null, jwtUserPayload);
         }

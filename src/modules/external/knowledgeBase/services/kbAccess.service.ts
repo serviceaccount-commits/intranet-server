@@ -1,3 +1,4 @@
+import { effectivePermissionIds } from '../../../internal/users/utils/effectivePermissions';
 import { inject, injectable } from 'inversify';
 
 import { TYPES } from '../../../../shared/config/containerTypes';
@@ -51,11 +52,7 @@ export class KbAccessService {
 
   async hasFullAccess(userId: string): Promise<boolean> {
     const user = await this.userRepository.findUserByIdWithPermissions(userId);
-    return (
-      user?.role?.permissions?.some(
-        (p) => p.permission_id === KB_PERM_ALL_ACCESS,
-      ) ?? false
-    );
+    return effectivePermissionIds(user).includes(KB_PERM_ALL_ACCESS);
   }
 
   /** Client ids the user may read, or `null` when unrestricted (KB manager). */

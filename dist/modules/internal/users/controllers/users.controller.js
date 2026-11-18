@@ -19,6 +19,14 @@ const CreateUserSchema_1 = require("../schema/users/CreateUserSchema");
 const zod_1 = require("zod");
 const FilterUserSchema_1 = require("../schema/users/FilterUserSchema");
 const BusinessValidationError_1 = require("../../../../shared/errors/BusinessValidationError");
+const SetUserRolesSchema = zod_1.z
+    .object({
+    roleId: zod_1.z.string().uuid(),
+    additionalRoleIds: zod_1.z.array(zod_1.z.string().uuid()).max(50).default([]),
+})
+    .strict();
+/** Only these people give or take roles, the main one included. */
+const ROLES_ASSIGN_PERMISSION = 'roles:assign';
 /** Directory admins edit anyone, themselves included, without limits. */
 const DIRECTORY_ADMIN_PERMISSION = 'directory:user:create';
 /** What a person may change on their own record without being an admin. */
@@ -208,6 +216,12 @@ let UserController = class UserController {
                     }
                 }
             }
+            if (input.roleId !== undefined && actorId) {
+                const actorPermissions = await this.userService.getUserPermissions(actorId);
+                if (!actorPermissions.includes(ROLES_ASSIGN_PERMISSION)) {
+                    return res.status(403).json({ message: 'Only an admin can change roles.' });
+                }
+            }
             const updatedUser = await this.userService.updateUser(userId, input);
             res.status(200).json(updatedUser);
         }
@@ -235,6 +249,49 @@ let UserController = class UserController {
                 return res.status(400).json({ message: error.message });
             }
         }
+    }
+    async getUserRoles(req, res) {
+        try {
+            res.json(await this.userService.getUserRoleIds(req.params['userId']));
+        }
+        catch (error) {
+            this.sendRolesError(res, error);
+        }
+    }
+    async setUserRoles(req, res) {
+        const parsed = SetUserRolesSchema.safeParse(req.body ?? {});
+        if (!parsed.success || !req.user?.id) {
+            return res.status(400).json({ message: 'Pick a main role; additional roles are optional.' });
+        }
+        try {
+            await this.userService.setUserRoles(req.params['userId'], parsed.data.roleId, parsed.data.additionalRoleIds, req.user.id);
+            res.sendStatus(204);
+        }
+        catch (error) {
+            this.sendRolesError(res, error);
+        }
+    }
+    async toggleAdditionalRole(req, res, enabled) {
+        const { userId, roleId } = req.params;
+        if (!userId || !roleId || !req.user?.id)
+            return res.sendStatus(400);
+        try {
+            await this.userService.toggleAdditionalRole(userId, roleId, enabled, req.user.id);
+            res.sendStatus(204);
+        }
+        catch (error) {
+            this.sendRolesError(res, error);
+        }
+    }
+    sendRolesError(res, error) {
+        if (error instanceof BusinessValidationError_1.BusinessValidationError) {
+            return res.status(422).json({ message: error.message, errors: error.errors });
+        }
+        if (error instanceof Error) {
+            const status = error.statusCode ?? 400;
+            return res.status(status).json({ message: error.message });
+        }
+        return res.status(500).json({ message: 'Could not change the roles' });
     }
     async deleteUser(req, res) {
         try {

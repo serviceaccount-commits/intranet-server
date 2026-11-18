@@ -15,7 +15,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserService = void 0;
+exports.UserService = exports.ROLES_ASSIGN = void 0;
+const effectivePermissions_1 = require("../utils/effectivePermissions");
+/** The permission that lets someone give or take roles from people. */
+exports.ROLES_ASSIGN = 'roles:assign';
 const inversify_1 = require("inversify");
 const ES_1 = __importDefault(require("../../../../shared/types/enum/ES"));
 const User_entity_1 = require("../entities/User.entity");
@@ -254,6 +257,7 @@ let UserService = class UserService {
                     : '',
                 assignments: user.assignments ? user.assignments : [],
                 role: user.role ? user.role : null,
+                additional_roles: user.additionalRoles ?? [],
             },
             private_profile: {
                 personal_email: details?.personal_email ?? '',
@@ -431,12 +435,65 @@ let UserService = class UserService {
             await this.userRepository.deleteUser(user);
         });
     }
+    // ─── Roles: one main role plus any number of additional ones ────────────────
+    /** Permissions a set of roles would give, to stop someone from removing
+     *  their own ability to assign roles. */
+    async permissionsOfRoles(roleIds) {
+        if (roleIds.length === 0)
+            return new Set();
+        const rows = await data_source_1.AppDataSource.query(`SELECT DISTINCT permission_id FROM role_permissions WHERE role_id = ANY($1::uuid[])`, [roleIds]);
+        return new Set(rows.map((r) => r.permission_id));
+    }
+    async getUserRoleIds(userId) {
+        const [user] = await data_source_1.AppDataSource.query(`SELECT role_id FROM users WHERE user_id = $1`, [userId]);
+        if (!user)
+            throw new NotFoundError_1.NotFoundError('User', userId);
+        const extra = await data_source_1.AppDataSource.query(`SELECT role_id FROM user_additional_roles WHERE user_id = $1`, [userId]);
+        return { roleId: user.role_id, additionalRoleIds: extra.map((r) => r.role_id) };
+    }
+    /** Replaces a person's main role and additional roles. */
+    async setUserRoles(userId, roleId, additionalRoleIds, actorId) {
+        await this.getUserRoleIds(userId); // 404 when the person does not exist
+        const extra = [...new Set(additionalRoleIds)].filter((id) => id !== roleId);
+        const ids = [roleId, ...extra];
+        const found = await data_source_1.AppDataSource.query(`SELECT role_id FROM roles WHERE role_id = ANY($1::uuid[])`, [ids]);
+        if (found.length !== ids.length)
+            throw new NotFoundError_1.NotFoundError('Role(s)');
+        if (userId === actorId && !(await this.permissionsOfRoles(ids)).has(exports.ROLES_ASSIGN)) {
+            throw new BusinessValidationError_1.BusinessValidationError('You would lose the ability to assign roles.', {
+                roles: 'You would lose the ability to assign roles.',
+            });
+        }
+        await data_source_1.AppDataSource.transaction(async (manager) => {
+            await manager.query(`UPDATE users SET role_id = $2 WHERE user_id = $1`, [userId, roleId]);
+            await manager.query(`DELETE FROM user_additional_roles WHERE user_id = $1`, [userId]);
+            if (extra.length > 0) {
+                await manager.query(`INSERT INTO user_additional_roles (user_id, role_id)
+           SELECT $1::uuid, x FROM unnest($2::uuid[]) AS x`, [userId, extra]);
+            }
+        });
+    }
+    /** Adds or removes one additional role (e.g. turning a module on or off). */
+    async toggleAdditionalRole(userId, roleId, enabled, actorId) {
+        const current = await this.getUserRoleIds(userId);
+        const next = new Set(current.additionalRoleIds);
+        if (enabled)
+            next.add(roleId);
+        else
+            next.delete(roleId);
+        if (!current.roleId) {
+            throw new BusinessValidationError_1.BusinessValidationError('This person has no main role yet.', {
+                roles: 'Give this person a main role first.',
+            });
+        }
+        await this.setUserRoles(userId, current.roleId, [...next], actorId);
+    }
     async getUserPermissions(userId) {
         const user = await this.userRepository.findUserWithPermissions(userId);
         if (!user) {
             throw new NotFoundError_1.NotFoundError('User', userId);
         }
-        return user.role.permissions.map((permission) => permission.permission_id);
+        return (0, effectivePermissions_1.effectivePermissionIds)(user);
     }
     async getSheetData(userId, sheetDataOption) {
         const user = await this.userRepository.findUserById(userId);

@@ -37,6 +37,9 @@ export interface IUserService {
   deleteUser(userId: string): Promise<void>;
 
   getUserPermissions(userId: string): Promise<string[]>;
+  getUserRoleIds(userId: string): Promise<{ roleId: string | null; additionalRoleIds: string[] }>;
+  setUserRoles(userId: string, roleId: string, additionalRoleIds: string[], actorId: string): Promise<void>;
+  toggleAdditionalRole(userId: string, roleId: string, enabled: boolean, actorId: string): Promise<void>;
 
   getSheetData(userId: string, sheetDataOption: 1 | 2): Promise<RankingRow[]>;
 }

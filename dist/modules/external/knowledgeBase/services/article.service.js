@@ -47,6 +47,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 var ArticleService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArticleService = void 0;
+const effectivePermissions_1 = require("../../../internal/users/utils/effectivePermissions");
 const inversify_1 = require("inversify");
 const cheerio = __importStar(require("cheerio"));
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
@@ -96,7 +97,7 @@ let ArticleService = class ArticleService {
     // ─── Helpers ──────────────────────────────────────────────────────────────────
     async getCanSeeDraft(userId) {
         const user = await this.userRepository.findUserByIdWithPermissions(userId);
-        return (user?.role.permissions.findIndex((p) => p.permission_id === KB_PERM_VIEW_METADATA) !== -1);
+        return (0, effectivePermissions_1.effectivePermissionIds)(user).includes(KB_PERM_VIEW_METADATA);
     }
     // ─── Create ───────────────────────────────────────────────────────────────────
     async createArticle(articleName, content, topicId, userId) {

@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.KbAccessService = void 0;
+const effectivePermissions_1 = require("../../../internal/users/utils/effectivePermissions");
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const ActionNotAllowedError_1 = require("../../../../shared/errors/ActionNotAllowedError");
@@ -57,7 +58,7 @@ let KbAccessService = class KbAccessService {
     }
     async hasFullAccess(userId) {
         const user = await this.userRepository.findUserByIdWithPermissions(userId);
-        return (user?.role?.permissions?.some((p) => p.permission_id === KB_PERM_ALL_ACCESS) ?? false);
+        return (0, effectivePermissions_1.effectivePermissionIds)(user).includes(KB_PERM_ALL_ACCESS);
     }
     /** Client ids the user may read, or `null` when unrestricted (KB manager). */
     async accessibleClientIds(userId) {

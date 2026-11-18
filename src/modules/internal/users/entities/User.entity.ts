@@ -86,6 +86,16 @@ export class User extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   role_id!: string;
 
+  /** Roles on top of the main one (modules such as "Knowledge Base", or
+   *  "Admin"). What a person may do is the union of all their roles. */
+  @ManyToMany(() => Role)
+  @JoinTable({
+    name: 'user_additional_roles',
+    joinColumn: { name: 'user_id', referencedColumnName: 'user_id' },
+    inverseJoinColumn: { name: 'role_id', referencedColumnName: 'role_id' },
+  })
+  additionalRoles?: Role[];
+
   @ManyToMany(() => Client, (client) => client.users)
   @JoinTable({
     name: 'user_clients', // The name of the join table

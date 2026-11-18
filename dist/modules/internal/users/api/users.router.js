@@ -23,7 +23,9 @@ const canListUsers = (0, permission_middleware_1.checkAnyPermission)('directory:
 // the directory permission.
 const canReadProfile = (0, permission_middleware_1.checkSelfOrPermission)('userId', 'directory:profile:access');
 const canEditUser = (0, permission_middleware_1.checkSelfOrPermission)('userId', 'directory:user:create');
-usersRouter.post('/', canAdminUsers, async (req, res, next) => {
+// Giving or taking roles (main and additional) is for admins only
+const canAssignRoles = (0, permission_middleware_1.checkPermission)('roles:assign');
+usersRouter.post('/', canAdminUsers, canAssignRoles, async (req, res, next) => {
     try {
         if (!userController) {
             userController = inversify_config_1.container.get(users_controller_1.default);
@@ -99,6 +101,46 @@ usersRouter.get('/profile/me/profile', async (req, res, next) => {
             userController = inversify_config_1.container.get(users_controller_1.default);
         }
         await userController.getMyUserProfile(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+usersRouter.get('/:userId/roles', canAssignRoles, async (req, res, next) => {
+    try {
+        if (!userController)
+            userController = inversify_config_1.container.get(users_controller_1.default);
+        await userController.getUserRoles(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+usersRouter.put('/:userId/roles', canAssignRoles, async (req, res, next) => {
+    try {
+        if (!userController)
+            userController = inversify_config_1.container.get(users_controller_1.default);
+        await userController.setUserRoles(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+usersRouter.post('/:userId/roles/:roleId', canAssignRoles, async (req, res, next) => {
+    try {
+        if (!userController)
+            userController = inversify_config_1.container.get(users_controller_1.default);
+        await userController.toggleAdditionalRole(req, res, true);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+usersRouter.delete('/:userId/roles/:roleId', canAssignRoles, async (req, res, next) => {
+    try {
+        if (!userController)
+            userController = inversify_config_1.container.get(users_controller_1.default);
+        await userController.toggleAdditionalRole(req, res, false);
     }
     catch (error) {
         next(error);

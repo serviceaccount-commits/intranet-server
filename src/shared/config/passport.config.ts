@@ -1,3 +1,4 @@
+import { effectivePermissionIds } from '../../modules/internal/users/utils/effectivePermissions';
 import { logger } from '../utils/logger';
 import passport from 'passport';
 import {
@@ -54,7 +55,7 @@ export const configurePassport = async () => {
           const jwtUserPayload: JwtUserPayload = {
             id: user.user_id,
             username: user.first_name,
-            permissions: user.role.permissions.map((p) => p.permission_id),
+            permissions: effectivePermissionIds(user),
           };
 
           return done(null, jwtUserPayload);

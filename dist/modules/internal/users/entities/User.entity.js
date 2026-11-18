@@ -42,6 +42,9 @@ let User = class User extends typeorm_1.BaseEntity {
     user_edit_available;
     role;
     role_id;
+    /** Roles on top of the main one (modules such as "Knowledge Base", or
+     *  "Admin"). What a person may do is the union of all their roles. */
+    additionalRoles;
     clients;
     assignments;
     announcements;
@@ -129,6 +132,15 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'uuid', nullable: true }),
     __metadata("design:type", String)
 ], User.prototype, "role_id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToMany)(() => Role_entity_1.Role),
+    (0, typeorm_1.JoinTable)({
+        name: 'user_additional_roles',
+        joinColumn: { name: 'user_id', referencedColumnName: 'user_id' },
+        inverseJoinColumn: { name: 'role_id', referencedColumnName: 'role_id' },
+    }),
+    __metadata("design:type", Array)
+], User.prototype, "additionalRoles", void 0);
 __decorate([
     (0, typeorm_1.ManyToMany)(() => Client_entity_1.Client, (client) => client.users),
     (0, typeorm_1.JoinTable)({

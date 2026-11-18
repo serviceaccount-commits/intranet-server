@@ -33,9 +33,13 @@ const canReadProfile = checkSelfOrPermission(
 );
 const canEditUser = checkSelfOrPermission('userId', 'directory:user:create');
 
+// Giving or taking roles (main and additional) is for admins only
+const canAssignRoles = checkPermission('roles:assign');
+
 usersRouter.post(
   '/',
   canAdminUsers,
+  canAssignRoles,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!userController) {
@@ -133,6 +137,58 @@ usersRouter.get(
         userController = container.get<UserController>(UserController);
       }
       await userController.getMyUserProfile(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+usersRouter.get(
+  '/:userId/roles',
+  canAssignRoles,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!userController) userController = container.get<UserController>(UserController);
+      await userController.getUserRoles(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+usersRouter.put(
+  '/:userId/roles',
+  canAssignRoles,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!userController) userController = container.get<UserController>(UserController);
+      await userController.setUserRoles(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+usersRouter.post(
+  '/:userId/roles/:roleId',
+  canAssignRoles,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!userController) userController = container.get<UserController>(UserController);
+      await userController.toggleAdditionalRole(req, res, true);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+usersRouter.delete(
+  '/:userId/roles/:roleId',
+  canAssignRoles,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!userController) userController = container.get<UserController>(UserController);
+      await userController.toggleAdditionalRole(req, res, false);
     } catch (error) {
       next(error);
     }

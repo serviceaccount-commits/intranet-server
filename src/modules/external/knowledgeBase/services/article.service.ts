@@ -1,3 +1,4 @@
+import { effectivePermissionIds } from '../../../internal/users/utils/effectivePermissions';
 import { inject, injectable } from 'inversify';
 import * as cheerio from 'cheerio';
 
@@ -83,11 +84,7 @@ export class ArticleService implements IArticleService {
 
   private async getCanSeeDraft(userId: string): Promise<boolean> {
     const user = await this.userRepository.findUserByIdWithPermissions(userId);
-    return (
-      user?.role.permissions.findIndex(
-        (p) => p.permission_id === KB_PERM_VIEW_METADATA,
-      ) !== -1
-    );
+    return effectivePermissionIds(user).includes(KB_PERM_VIEW_METADATA);
   }
 
   // ─── Create ───────────────────────────────────────────────────────────────────

@@ -250,6 +250,7 @@ export class UserRepository implements IUserRepository {
       .leftJoinAndSelect('user.userDetails', 'userDetails')
 
       .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.additionalRoles', 'additionalRoles')
 
       .leftJoinAndSelect('user.reportingTo', 'reportsToRel')
       .leftJoinAndSelect('reportsToRel.reportsToUser', 'reportsTo')
@@ -285,6 +286,7 @@ export class UserRepository implements IUserRepository {
       relations: {
         userDetails: true,
         role: { permissions: true },
+        additionalRoles: { permissions: true },
         clients: true,
       },
     });
@@ -306,6 +308,7 @@ export class UserRepository implements IUserRepository {
       },
       relations: {
         role: { permissions: true },
+        additionalRoles: { permissions: true },
       },
     });
   }
@@ -383,6 +386,7 @@ export class UserRepository implements IUserRepository {
       },
       relations: {
         role: { permissions: true },
+        additionalRoles: { permissions: true },
       },
     });
   }
