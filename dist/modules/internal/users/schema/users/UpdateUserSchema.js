@@ -30,5 +30,9 @@ exports.UpdateUserSchema = zod_1.z
     assignmentIds: zod_1.z.array(zod_1.z.string().min(1)),
     reportsToId: zod_1.z.string().min(1),
 })
+    // Partial: the editor sends only what changed. Re-sending the whole record
+    // made any save (a new client, a new role) fail on unrelated legacy data,
+    // such as a profile imported without an emergency contact.
+    .partial()
     .strict();
 //# sourceMappingURL=UpdateUserSchema.js.map

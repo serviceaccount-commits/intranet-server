@@ -10,6 +10,28 @@ import { FilterUserSchema } from '../schema/users/FilterUserSchema';
 import { BusinessValidationError } from '../../../../shared/errors/BusinessValidationError';
 
 
+/** Directory admins edit anyone, themselves included, without limits. */
+const DIRECTORY_ADMIN_PERMISSION = 'directory:user:create';
+
+/** What a person may change on their own record without being an admin. */
+const SELF_EDITABLE_FIELDS = new Set([
+  'firstName',
+  'lastName',
+  'workPhone',
+  'personalEmail',
+  'personalPhone',
+  'residentialCountry',
+  'countryNationality',
+  'emergencyContactName',
+  'emergencyContactPhone',
+]);
+
+/** `emergencyContactPhone` → `Emergency contact phone` */
+const humanize = (field: string): string => {
+  const words = field.replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
 @injectable()
 export default class UserController {
   constructor(@inject(TYPES.IUserService) private userService: IUserService) {}
@@ -197,7 +219,25 @@ export default class UserController {
         return res.status(400).json({ error: 'Invalid user id' });
       }
 
-      const input: UpdateUserInput = req.body;
+      const input: UpdateUserInput = req.body ?? {};
+
+      // The route lets anyone edit their own record. Who they are and what they
+      // can reach (role, clients, team, status) stays with the directory admins.
+      const actorId = req.user?.id;
+      if (actorId === userId) {
+        const permissions = await this.userService.getUserPermissions(actorId);
+        if (!permissions.includes(DIRECTORY_ADMIN_PERMISSION)) {
+          const locked = Object.keys(input).filter(
+            (field) => !SELF_EDITABLE_FIELDS.has(field),
+          );
+          if (locked.length > 0) {
+            return res.status(403).json({
+              message: 'Only a directory admin can change your role, clients, team or status.',
+              fields: locked,
+            });
+          }
+        }
+      }
 
       const updatedUser = await this.userService.updateUser(userId, input);
 
@@ -211,8 +251,16 @@ export default class UserController {
       }
 
       if (error instanceof ZodError) {
-
-        return res.status(400).json(error);
+        // Same shape as the business errors, so the editor can show the reason
+        const errors: Record<string, string> = {};
+        for (const issue of error.issues) {
+          const field = String(issue.path[0] ?? 'form');
+          if (!errors[field]) errors[field] = `${humanize(field)}: ${issue.message}`;
+        }
+        return res.status(422).json({
+          message: Object.values(errors)[0] ?? 'Some fields are not valid.',
+          errors,
+        });
       }
       if (error instanceof Error) {
 

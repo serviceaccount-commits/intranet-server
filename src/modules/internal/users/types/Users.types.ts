@@ -24,7 +24,7 @@ export interface PrivateUserProfile {
   clients: Client[];
   emergency_contact_name: string;
   emergency_contact_phone: string;
-  hire_date: Date;
+  hire_date: Date | null;
   selectable_as_leader: boolean;
   last_activity_at: Date | null;
 }

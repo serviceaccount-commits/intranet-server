@@ -312,8 +312,10 @@ export class UserService implements IUserService {
     }
 
     let workNumber = user.work_phone;
-    let personalNumber = user.userDetails.personal_phone;
-    let emergencyContactNumber = user.userDetails.emergency_contact_phone;
+    // A user without a details row must still open in the editor
+    const details = user.userDetails;
+    let personalNumber = details?.personal_phone ?? '';
+    let emergencyContactNumber = details?.emergency_contact_phone ?? '';
     // if (user.work_phone && withNoPhoneNumberCode) {
     //   const original = user.work_phone;
 
@@ -356,14 +358,14 @@ export class UserService implements IUserService {
         role: user.role ? user.role : null,
       },
       private_profile: {
-        personal_email: user.userDetails.personal_email,
+        personal_email: details?.personal_email ?? '',
         personal_phone: personalNumber,
-        residential_country: user.userDetails.residential_country,
-        country_nationality: user.userDetails.country_nationality,
-        emergency_contact_name: user.userDetails.emergency_contact_name,
+        residential_country: details?.residential_country ?? '',
+        country_nationality: details?.country_nationality ?? '',
+        emergency_contact_name: details?.emergency_contact_name ?? '',
         emergency_contact_phone: emergencyContactNumber,
         selectable_as_leader: user.selectable_as_leader,
-        hire_date: user.userDetails.hire_date,
+        hire_date: details?.hire_date ?? null,
         clients: user.clients ? user.clients : [],
         last_activity_at: user.last_activity_at || null,
       },
