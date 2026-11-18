@@ -5,7 +5,12 @@ import { AppDataSource } from '../../../../shared/database/data-source';
 import { Topic } from '../entities/Topic.entity';
 import { TopicUserAccess } from '../entities/TopicUserAccess.entity';
 import { ITopicRepository } from '../interfaces/topics/topic.repository.interface';
-import { KbTopic, KbTopicAccessUser } from '../database/kb-domain.types';
+import {
+  KbClientAccessChange,
+  KbClientAccessPerson,
+  KbTopic,
+  KbTopicAccessUser,
+} from '../database/kb-domain.types';
 
 @injectable()
 export class TopicRepository implements ITopicRepository {
@@ -153,6 +158,55 @@ export class TopicRepository implements ITopicRepository {
         ORDER BY u.first_name, u.last_name`,
       [clientId],
     );
+  }
+
+  /** Every active person, with whether their role opens the Knowledge Base. */
+  async findActiveStaffWithKbFlag(): Promise<KbClientAccessPerson[]> {
+    return this.repo.query(
+      `SELECT u.user_id, u.first_name, u.last_name, u.work_email,
+              u.job_title, r.role_name,
+              EXISTS (SELECT 1 FROM role_permissions rp
+                       WHERE rp.role_id = u.role_id AND rp.permission_id = 'kb:access') AS kb_access
+         FROM users u
+         LEFT JOIN roles r ON r.role_id = u.role_id
+        WHERE u.status = 'active'
+        ORDER BY u.first_name, u.last_name`,
+    );
+  }
+
+  /** Who is on a client and on its folder lists, applied in one transaction. */
+  async applyClientAccess(
+    clientId: string,
+    addUserIds: string[],
+    removeUserIds: string[],
+    lists: KbClientAccessChange[],
+  ): Promise<void> {
+    await AppDataSource.manager.transaction(async (manager) => {
+      if (addUserIds.length > 0) {
+        await manager.query(
+          `INSERT INTO user_clients (user_id, client_id)
+           SELECT x.user_id, $1::uuid FROM unnest($2::uuid[]) AS x(user_id)
+            WHERE NOT EXISTS (SELECT 1 FROM user_clients uc
+                               WHERE uc.user_id = x.user_id AND uc.client_id = $1::uuid)`,
+          [clientId, addUserIds],
+        );
+      }
+      if (removeUserIds.length > 0) {
+        await manager.query(
+          `DELETE FROM user_clients WHERE client_id = $1::uuid AND user_id = ANY($2::uuid[])`,
+          [clientId, removeUserIds],
+        );
+      }
+      for (const list of lists) {
+        await manager.delete(TopicUserAccess, { topic_id: list.topicId });
+        if (list.userIds.length > 0) {
+          await manager.insert(
+            TopicUserAccess,
+            list.userIds.map((user_id) => ({ topic_id: list.topicId, user_id })),
+          );
+        }
+      }
+    });
   }
 
   async findUsersByIds(userIds: string[]): Promise<KbTopicAccessUser[]> {

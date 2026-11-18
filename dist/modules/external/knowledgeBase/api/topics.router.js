@@ -36,6 +36,23 @@ topicsRouter.get('/access/users/:userId', canManageTopics, async (req, res, next
         next(error);
     }
 });
+// One client at once: who is on it and who sees each of its folders
+topicsRouter.get('/access/clients/:clientId', canManageTopics, async (req, res, next) => {
+    try {
+        await topicController.getClientAccess(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+topicsRouter.put('/access/clients/:clientId', canManageTopics, async (req, res, next) => {
+    try {
+        await topicController.setClientAccess(req, res);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 topicsRouter.get('/:topicId', async (req, res, next) => {
     try {
         await topicController.getTopicById(req, res);

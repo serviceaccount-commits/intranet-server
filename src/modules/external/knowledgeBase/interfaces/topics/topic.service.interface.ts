@@ -1,4 +1,10 @@
-import { KbTopic, KbTopicAccessUser, KbUserFolderAccessClient } from '../../database/kb-domain.types';
+import {
+  KbClientAccessMatrix,
+  KbTopic,
+  KbTopicAccessUser,
+  KbUserFolderAccessClient,
+} from '../../database/kb-domain.types';
+import { ClientAccessInput } from '../../schema/topics/ClientAccessSchema';
 import { CreateTopicInput } from '../../schema/topics/CreateTopicSchema';
 import { UpdateTopicInput } from '../../schema/topics/UpdateTopicSchema';
 import {
@@ -35,4 +41,10 @@ export interface ITopicService {
     allowed: boolean,
     userId: string,
   ): Promise<void>;
+  getClientAccess(clientId: string, userId: string): Promise<KbClientAccessMatrix>;
+  setClientAccess(
+    clientId: string,
+    input: ClientAccessInput,
+    userId: string,
+  ): Promise<{ added: number; removed: number; folders: number }>;
 }

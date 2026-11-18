@@ -1,4 +1,9 @@
-import { KbTopic, KbTopicAccessUser } from '../../database/kb-domain.types';
+import {
+  KbClientAccessChange,
+  KbClientAccessPerson,
+  KbTopic,
+  KbTopicAccessUser,
+} from '../../database/kb-domain.types';
 
 export interface ITopicRepository {
   create(data: Partial<KbTopic>): Promise<KbTopic>;
@@ -22,4 +27,11 @@ export interface ITopicRepository {
   replaceAccess(topicId: string, userIds: string[]): Promise<void>;
   findClientStaff(clientId: string): Promise<KbTopicAccessUser[]>;
   findUsersByIds(userIds: string[]): Promise<KbTopicAccessUser[]>;
+  findActiveStaffWithKbFlag(): Promise<KbClientAccessPerson[]>;
+  applyClientAccess(
+    clientId: string,
+    addUserIds: string[],
+    removeUserIds: string[],
+    lists: KbClientAccessChange[],
+  ): Promise<void>;
 }

@@ -16,6 +16,7 @@ exports.TopicController = void 0;
 const inversify_1 = require("inversify");
 const containerTypes_1 = require("../../../../shared/config/containerTypes");
 const AppError_1 = require("../../../../shared/errors/AppError");
+const zod_1 = require("zod");
 const sendError = (res, error) => {
     if (error instanceof AppError_1.AppError) {
         return res.status(error.statusCode).json({ message: error.message });
@@ -145,6 +146,38 @@ let TopicController = class TopicController {
             res.json(await this.topicService.getUserFolderAccess(targetUserId, userId));
         }
         catch (error) {
+            sendError(res, error);
+        }
+    }
+    async getClientAccess(req, res) {
+        const { clientId } = req.params;
+        const userId = req.user?.id;
+        if (!clientId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            res.json(await this.topicService.getClientAccess(clientId, userId));
+        }
+        catch (error) {
+            sendError(res, error);
+        }
+    }
+    async setClientAccess(req, res) {
+        const { clientId } = req.params;
+        const userId = req.user?.id;
+        if (!clientId || !userId) {
+            res.sendStatus(400);
+            return;
+        }
+        try {
+            res.json(await this.topicService.setClientAccess(clientId, req.body ?? {}, userId));
+        }
+        catch (error) {
+            if (error instanceof zod_1.ZodError) {
+                res.status(400).json({ message: 'The access sent is not valid.' });
+                return;
+            }
             sendError(res, error);
         }
     }

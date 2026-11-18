@@ -5,7 +5,15 @@ import { ITopicRepository } from '../interfaces/topics/topic.repository.interfac
 import { IArticleRepository } from '../interfaces/articles/article.repository.interface';
 import { IClientRepository } from '../interfaces/clients/client.repository.interface';
 import { IUserRepository } from '../../../internal/users/interfaces/users/user.repository.interface';
-import { KbTopic, KbTopicAccessUser, KbUserFolderAccessClient } from '../database/kb-domain.types';
+import {
+  KbClientAccessChange,
+  KbClientAccessFolder,
+  KbClientAccessMatrix,
+  KbTopic,
+  KbTopicAccessUser,
+  KbUserFolderAccessClient,
+} from '../database/kb-domain.types';
+import { ClientAccessInput, ClientAccessSchema } from '../schema/topics/ClientAccessSchema';
 import { NotFoundError } from '../../../../shared/errors/NotFoundError';
 import { AuthenticationError } from '../../../../shared/errors/AuthenticationError';
 import { ValidationError } from '../../../../shared/errors/ValidationError';
@@ -341,7 +349,11 @@ export class TopicService implements ITopicService {
     if (unique.length > 0) {
       const staff = await this.topicRepository.findClientStaff(topic.client_id);
       const staffIds = new Set(staff.map((u) => u.user_id));
-      if (unique.some((id) => !staffIds.has(id))) {
+      // Someone already on the list may stay even after losing the client
+      // (the client check hides the folder from them anyway); only newcomers
+      // must be staff of the client.
+      const current = (await this.topicRepository.findAccessByTopicIds([topicId])).get(topicId);
+      if (unique.some((id) => !staffIds.has(id) && !current?.has(id))) {
         throw new ValidationError(
           'Only staff with access to this client can be given access to its folders.',
         );
@@ -451,5 +463,149 @@ export class TopicService implements ITopicService {
 
     if (next.size === current.size) return;
     await this.topicRepository.replaceAccess(topicId, [...next]);
+  }
+
+  // ─── One client: who is on it and on each of its folders (Manage access) ──────
+
+  /** Folders in tree order (A→Z within each parent). A folder whose parent is
+   *  not in the set is shown at the top level. */
+  private orderAsTree(topics: KbTopic[]): { topic: KbTopic; depth: number }[] {
+    const ids = new Set(topics.map((t) => t.topic_id));
+    const children = new Map<string | null, KbTopic[]>();
+    for (const t of topics) {
+      const parent = t.parent_topic_id && ids.has(t.parent_topic_id) ? t.parent_topic_id : null;
+      if (!children.has(parent)) children.set(parent, []);
+      children.get(parent)!.push(t);
+    }
+    for (const list of children.values()) {
+      list.sort((a, b) => a.topic_name.trim().localeCompare(b.topic_name.trim()));
+    }
+    const out: { topic: KbTopic; depth: number }[] = [];
+    const seen = new Set<string>();
+    const walk = (parent: string | null, depth: number) => {
+      for (const t of children.get(parent) ?? []) {
+        if (seen.has(t.topic_id)) continue;
+        seen.add(t.topic_id);
+        out.push({ topic: t, depth });
+        walk(t.topic_id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }
+
+  async getClientAccess(clientId: string, userId: string): Promise<KbClientAccessMatrix> {
+    await this.kbAccess.assertClientAccess(userId, clientId);
+    const client = await this.clientRepository.findById(clientId);
+    if (!client) throw new NotFoundError('Client', clientId);
+
+    const topics = await this.topicRepository.findAllByClientId(clientId);
+    const visible = await this.kbAccess.filterVisibleTopics(userId, topics);
+    const access = await this.topicRepository.findAccessByTopicIds(
+      visible.map((t) => t.topic_id),
+    );
+    const [people, staff] = await Promise.all([
+      this.topicRepository.findActiveStaffWithKbFlag(),
+      this.topicRepository.findClientStaff(clientId),
+    ]);
+    const memberIds = new Set(staff.map((u) => u.user_id));
+
+    const folders: KbClientAccessFolder[] = this.orderAsTree(visible).map(({ topic, depth }) => {
+      const list = access.get(topic.topic_id);
+      return {
+        topic_id: topic.topic_id,
+        topic_name: topic.topic_name.trim(),
+        parent_topic_id: topic.parent_topic_id,
+        depth,
+        allowed: list && list.size > 0 ? [...list] : null,
+      };
+    });
+
+    return {
+      client: { client_id: client.client_id, client_name: client.client_name.trim() },
+      folders,
+      members: people.filter((p) => memberIds.has(p.user_id)),
+      people,
+      hidden_folders: topics.length - visible.length,
+    };
+  }
+
+  /** Saves the whole screen at once: who is on the client and the list of
+   *  every folder sent. People taken off the client also leave the lists of
+   *  the folders not sent (those the caller cannot see), unless that would
+   *  leave a list empty and open the folder to everyone. */
+  async setClientAccess(
+    clientId: string,
+    input: ClientAccessInput,
+    userId: string,
+  ): Promise<{ added: number; removed: number; folders: number }> {
+    const data = ClientAccessSchema.parse(input);
+    await this.kbAccess.assertClientAccess(userId, clientId);
+    const fullAccess = await this.kbAccess.hasFullAccess(userId);
+
+    const members = [...new Set(data.members)];
+    const memberSet = new Set(members);
+    const active = new Set(
+      (await this.topicRepository.findActiveStaffWithKbFlag()).map((p) => p.user_id),
+    );
+    if (members.some((id) => !active.has(id))) {
+      throw new ValidationError('Only active staff can be added to a client.');
+    }
+    if (!fullAccess && !memberSet.has(userId)) {
+      throw new ValidationError('Keep yourself on the client, or you will lose access to it.');
+    }
+
+    const current = new Set(
+      (await this.topicRepository.findClientStaff(clientId)).map((u) => u.user_id),
+    );
+    const add = members.filter((id) => !current.has(id));
+    const remove = [...current].filter((id) => !memberSet.has(id));
+    const removeSet = new Set(remove);
+
+    const topics = await this.topicRepository.findAllByClientId(clientId);
+    const visible = new Map(
+      (await this.kbAccess.filterVisibleTopics(userId, topics)).map((t) => [t.topic_id, t]),
+    );
+    const access = await this.topicRepository.findAccessByTopicIds(topics.map((t) => t.topic_id));
+
+    const lists: KbClientAccessChange[] = [];
+    const sent = new Set<string>();
+    for (const folder of data.folders) {
+      const topic = visible.get(folder.topic_id);
+      if (!topic) {
+        throw new ValidationError('One of the folders is not part of this client.');
+      }
+      if (sent.has(folder.topic_id)) continue;
+      sent.add(folder.topic_id);
+
+      const allowed = [...new Set(folder.allowed ?? [])];
+      const name = topic.topic_name.trim();
+      if (allowed.some((id) => !memberSet.has(id))) {
+        throw new ValidationError(`Only people on the client can be on "${name}".`);
+      }
+      if (allowed.length > 0 && !fullAccess && !allowed.includes(userId)) {
+        throw new ValidationError(`Keep yourself on "${name}", or you will lose access to it.`);
+      }
+      const before = access.get(folder.topic_id) ?? new Set<string>();
+      const same = before.size === allowed.length && allowed.every((id) => before.has(id));
+      if (!same) lists.push({ topicId: folder.topic_id, userIds: allowed });
+    }
+
+    if (removeSet.size > 0) {
+      for (const topic of topics) {
+        if (sent.has(topic.topic_id)) continue;
+        const before = access.get(topic.topic_id);
+        if (!before || before.size === 0) continue;
+        const next = [...before].filter((id) => !removeSet.has(id));
+        // An empty list would open the folder to everyone; keep it restricted
+        if (next.length === before.size || next.length === 0) continue;
+        lists.push({ topicId: topic.topic_id, userIds: next });
+      }
+    }
+
+    if (add.length > 0 || remove.length > 0 || lists.length > 0) {
+      await this.topicRepository.applyClientAccess(clientId, add, remove, lists);
+    }
+    return { added: add.length, removed: remove.length, folders: lists.length };
   }
 }

@@ -6,6 +6,7 @@ import { ITopicService } from '../interfaces/topics/topic.service.interface';
 import { CreateTopicInput } from '../schema/topics/CreateTopicSchema';
 import { UpdateTopicInput } from '../schema/topics/UpdateTopicSchema';
 import { AppError } from '../../../../shared/errors/AppError';
+import { ZodError } from 'zod';
 
 const sendError = (res: Response, error: unknown) => {
   if (error instanceof AppError) {
@@ -151,6 +152,38 @@ export class TopicController {
     try {
       res.json(await this.topicService.getUserFolderAccess(targetUserId, userId));
     } catch (error) {
+      sendError(res, error);
+    }
+  }
+
+  async getClientAccess(req: Request, res: Response) {
+    const { clientId } = req.params;
+    const userId = req.user?.id;
+    if (!clientId || !userId) {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      res.json(await this.topicService.getClientAccess(clientId, userId));
+    } catch (error) {
+      sendError(res, error);
+    }
+  }
+
+  async setClientAccess(req: Request, res: Response) {
+    const { clientId } = req.params;
+    const userId = req.user?.id;
+    if (!clientId || !userId) {
+      res.sendStatus(400);
+      return;
+    }
+    try {
+      res.json(await this.topicService.setClientAccess(clientId, req.body ?? {}, userId));
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ message: 'The access sent is not valid.' });
+        return;
+      }
       sendError(res, error);
     }
   }

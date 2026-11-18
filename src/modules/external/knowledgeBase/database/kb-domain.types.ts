@@ -330,3 +330,35 @@ export interface KbTopicAccessUser {
   job_title?: string | null;
   role_name?: string | null;
 }
+
+/** A person in the client access matrix. `kb_access`: their role opens the KB. */
+export interface KbClientAccessPerson extends KbTopicAccessUser {
+  kb_access: boolean;
+}
+
+/** A folder column of the client access matrix, in tree order. */
+export interface KbClientAccessFolder {
+  topic_id: string;
+  topic_name: string;
+  parent_topic_id: string | null;
+  depth: number;
+  /** Who is on the folder's list; `null` when it is open to everyone on the client. */
+  allowed: string[] | null;
+}
+
+/** Everything the "Manage access" screen of one client needs. */
+export interface KbClientAccessMatrix {
+  client: { client_id: string; client_name: string };
+  folders: KbClientAccessFolder[];
+  /** Active staff assigned to the client. */
+  members: KbClientAccessPerson[];
+  /** Every active person, to add to the client. */
+  people: KbClientAccessPerson[];
+  /** Folders of the client the caller cannot see; they are left untouched. */
+  hidden_folders: number;
+}
+
+export interface KbClientAccessChange {
+  topicId: string;
+  userIds: string[];
+}
