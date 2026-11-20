@@ -580,13 +580,17 @@ export class TopicService implements ITopicService {
 
       const allowed = [...new Set(folder.allowed ?? [])];
       const name = topic.topic_name.trim();
-      if (allowed.some((id) => !memberSet.has(id))) {
+      const before = access.get(folder.topic_id) ?? new Set<string>();
+      // The screen only shows the client's people but sends each list back
+      // whole, so someone already on the list without being on the client
+      // (admins put there directly) stays as is. Only new names must be on it.
+      const keptOutsider = (id: string) => before.has(id) && !current.has(id);
+      if (allowed.some((id) => !memberSet.has(id) && !keptOutsider(id))) {
         throw new ValidationError(`Only people on the client can be on "${name}".`);
       }
       if (allowed.length > 0 && !fullAccess && !allowed.includes(userId)) {
         throw new ValidationError(`Keep yourself on "${name}", or you will lose access to it.`);
       }
-      const before = access.get(folder.topic_id) ?? new Set<string>();
       const same = before.size === allowed.length && allowed.every((id) => before.has(id));
       if (!same) lists.push({ topicId: folder.topic_id, userIds: allowed });
     }
