@@ -58,19 +58,30 @@ export class ArticleChunkRepository implements IArticleChunkRepository {
   }
 
   async loadAllForSearch(): Promise<ChunkSearchResult[]> {
-    const docs = await this.col
-      .find({}, { projection: { content: 1, embedding: 1, article_id: 1, version_id: 1, chunk_index: 1, audience: 1 } })
-      .toArray();
-    return docs.map((d) => ({
-      _id: d._id.toString(),
-      article_id: d.article_id.toString(),
-      version_id: d.version_id.toString(),
-      chunk_index: d.chunk_index,
-      content: d.content,
-      embedding: d.embedding,
-      // Chunks written before dual-view have no audience → treat as internal.
-      audience: d.audience ?? 'internal',
-    }));
+    // The collection is ~360 MB of BSON (8k+ chunks × 3072 dims). Stream it in
+    // batches and keep each vector as a Float32Array so a load never holds the
+    // whole raw result set plus its JS copy at once.
+    const cursor = this.col.find(
+      {},
+      {
+        projection: { content: 1, embedding: 1, article_id: 1, version_id: 1, chunk_index: 1, audience: 1 },
+        batchSize: 200,
+      },
+    );
+    const out: ChunkSearchResult[] = [];
+    for await (const d of cursor) {
+      out.push({
+        _id: d._id.toString(),
+        article_id: d.article_id.toString(),
+        version_id: d.version_id.toString(),
+        chunk_index: d.chunk_index,
+        content: d.content,
+        embedding: Float32Array.from(d.embedding ?? []),
+        // Chunks written before dual-view have no audience → treat as internal.
+        audience: d.audience ?? 'internal',
+      });
+    }
+    return out;
   }
 
   async deleteByVersionId(versionId: ObjectId): Promise<number> {

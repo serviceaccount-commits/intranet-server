@@ -16,7 +16,9 @@ export interface ChunkSearchResult {
   version_id: string;
   chunk_index: number;
   content: string;
-  embedding: number[];
+  /** Float32 instead of a JS number array: the search cache holds every
+   *  chunk's 3072-dim vector, and boxed doubles made it too big for the box. */
+  embedding: Float32Array;
   audience: ChunkAudience;
 }
 

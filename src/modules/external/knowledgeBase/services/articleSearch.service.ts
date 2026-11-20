@@ -90,6 +90,7 @@ export class ArticleSearchService {
   private cache: ChunkSearchResult[] = [];
   private cacheLoadedAt: number | null = null;
   private cacheTtlMs = 5 * 60 * 1000;
+  private cacheLoading: Promise<void> | null = null;
 
   constructor(
     @inject(TYPES.IArticleChunkRepository)
@@ -105,9 +106,28 @@ export class ArticleSearchService {
   private async ensureCache(): Promise<void> {
     const fresh = this.cacheLoadedAt !== null && Date.now() - this.cacheLoadedAt < this.cacheTtlMs;
     if (fresh && this.cache.length > 0) return;
-    this.cache = await this.chunkRepository.loadAllForSearch();
-    this.cacheLoadedAt = Date.now();
-    logger.info(`[search] chunk cache loaded: ${this.cache.length} chunks`);
+
+    // One load at a time. Search-as-you-type fires a request per keystroke, and
+    // each one used to reload the full chunk set when the TTL ran out; a few of
+    // those in parallel exhausted the 4 GB box and took the intranet down
+    // (2026-11-20). Searches keep using the previous snapshot while it refreshes;
+    // only the very first load (empty cache) waits for it.
+    if (!this.cacheLoading) {
+      this.cacheLoading = (async () => {
+        try {
+          const chunks = await this.chunkRepository.loadAllForSearch();
+          this.cache = chunks;
+          this.cacheLoadedAt = Date.now();
+          logger.info(`[search] chunk cache loaded: ${chunks.length} chunks`);
+        } catch (error) {
+          logger.error('[search] chunk cache load failed:', error);
+        } finally {
+          this.cacheLoading = null;
+        }
+      })();
+    }
+    const loading = this.cacheLoading;
+    if (this.cache.length === 0 && loading) await loading;
   }
 
   async search(query: string, options: SearchOptions = {}): Promise<SearchHit[]> {
@@ -451,7 +471,7 @@ export function buildPreview(chunk: string, query: string): string {
 
 // ─── Math ───────────────────────────────────────────────────────────────────────
 
-function cosineSimilarity(a: number[], b: number[]): number {
+function cosineSimilarity(a: ArrayLike<number>, b: ArrayLike<number>): number {
   if (a.length !== b.length || a.length === 0) return 0;
   let dot = 0;
   let normA = 0;

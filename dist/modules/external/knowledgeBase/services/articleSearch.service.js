@@ -78,6 +78,7 @@ let ArticleSearchService = class ArticleSearchService {
     cache = [];
     cacheLoadedAt = null;
     cacheTtlMs = 5 * 60 * 1000;
+    cacheLoading = null;
     constructor(chunkRepository, articleRepository) {
         this.chunkRepository = chunkRepository;
         this.articleRepository = articleRepository;
@@ -89,9 +90,30 @@ let ArticleSearchService = class ArticleSearchService {
         const fresh = this.cacheLoadedAt !== null && Date.now() - this.cacheLoadedAt < this.cacheTtlMs;
         if (fresh && this.cache.length > 0)
             return;
-        this.cache = await this.chunkRepository.loadAllForSearch();
-        this.cacheLoadedAt = Date.now();
-        logger_1.logger.info(`[search] chunk cache loaded: ${this.cache.length} chunks`);
+        // One load at a time. Search-as-you-type fires a request per keystroke, and
+        // each one used to reload the full chunk set when the TTL ran out; a few of
+        // those in parallel exhausted the 4 GB box and took the intranet down
+        // (2026-11-20). Searches keep using the previous snapshot while it refreshes;
+        // only the very first load (empty cache) waits for it.
+        if (!this.cacheLoading) {
+            this.cacheLoading = (async () => {
+                try {
+                    const chunks = await this.chunkRepository.loadAllForSearch();
+                    this.cache = chunks;
+                    this.cacheLoadedAt = Date.now();
+                    logger_1.logger.info(`[search] chunk cache loaded: ${chunks.length} chunks`);
+                }
+                catch (error) {
+                    logger_1.logger.error('[search] chunk cache load failed:', error);
+                }
+                finally {
+                    this.cacheLoading = null;
+                }
+            })();
+        }
+        const loading = this.cacheLoading;
+        if (this.cache.length === 0 && loading)
+            await loading;
     }
     async search(query, options = {}) {
         const trimmed = (query ?? '').trim();
