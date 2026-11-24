@@ -681,8 +681,10 @@ let ArticleController = class ArticleController {
             res.sendStatus(400);
             return;
         }
-        const article = await this.articleService.getArticleLockInfo(articleId);
-        return res.json(article);
+        // A plain true/false, as the editor reads it. It used to send the lock
+        // record itself, which the editor took for "available" every time.
+        const available = await this.articleService.isArticleLockAvailable(articleId);
+        return res.json(available);
     }
     async getExternalClientArticleDetails(req, res, next) {
         const { clientSharedId } = req.params;

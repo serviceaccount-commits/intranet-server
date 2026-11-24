@@ -47,6 +47,14 @@ import { KbArchiveFolderService, withoutArchiveFolders } from './kbArchiveFolder
 
 const KB_PERM_VIEW_METADATA = 'kb:article:view:metadata';
 
+/** A lock counts only while it has a holder and has not run out: a holder who
+ *  closed the tab without releasing stops blocking once the lock expires. */
+function hasLiveLock(lockInfo: ArticleLockInfo, now: Date): boolean {
+  return Boolean(
+    lockInfo.locked_by_user_id && lockInfo.lock_expires_at && lockInfo.lock_expires_at > now,
+  );
+}
+
 @injectable()
 export class ArticleService implements IArticleService {
   constructor(
@@ -267,12 +275,20 @@ export class ArticleService implements IArticleService {
     if (!lockInfo) throw new NotFoundError('Article', versionId);
 
     const now = new Date();
-    if (lockInfo.locked_by_user_id && lockInfo.lock_expires_at && lockInfo.lock_expires_at > now) {
+    if (hasLiveLock(lockInfo, now)) {
       throw new BusinessLogicError('Article is currently being edited by another user.');
     }
 
     const expiresAt = new Date(now.getTime() + ARTICLE_LOCK_DURATION_MS);
     await this.articleRepository.acquireLock(versionId, userId, expiresAt);
+  }
+
+  /** Whether the article can be taken for editing right now — the same test
+   *  startArticleEdit applies, so the editor's indicator never disagrees with it. */
+  async isArticleLockAvailable(versionId: string): Promise<boolean> {
+    const lockInfo = await this.articleRepository.getLockInfo(versionId);
+    if (!lockInfo) throw new NotFoundError('Article', versionId);
+    return !hasLiveLock(lockInfo, new Date());
   }
 
   async refreshEditLock(userId: string, versionId: string): Promise<void> {

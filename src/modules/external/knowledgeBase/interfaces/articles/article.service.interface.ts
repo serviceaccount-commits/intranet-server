@@ -70,6 +70,7 @@ export interface IArticleService {
   closeArticleEdit(userId: string, versionId: string): Promise<void>;
   releaseAllArticleLocks(): Promise<void>;
   getArticleLockInfo(versionId: string): Promise<ArticleLockInfo>;
+  isArticleLockAvailable(versionId: string): Promise<boolean>;
 
   // ── Tags ─────────────────────────────────────────────────────────────────────
   addTagToArticle(versionId: string, tagName: string): Promise<KbTag>;
